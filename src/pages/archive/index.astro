@@ -1,0 +1,147 @@
+---
+/**
+ * 时间树页 (/archive/)
+ *
+ * 根据文章发布时间自动生成年份与月份层级归档。
+ * 年份倒序排列，年份下的月份倒序排列。
+ * 只显示有已发布文章的月份。
+ * 点击年份进入该年全部文章合集，点击月份进入该月文章合集。
+ */
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import Container from '@/components/Container.astro';
+import '@/styles/page.css';
+import { getArchiveTree } from '@/utils/articles';
+import { withBase } from '@/utils/site';
+
+const archiveTree = await getArchiveTree();
+
+/** 月份编号转中文显示 */
+const monthNames: Record<string, string> = {
+  '01': '1月', '02': '2月', '03': '3月', '04': '4月',
+  '05': '5月', '06': '6月', '07': '7月', '08': '8月',
+  '09': '9月', '10': '10月', '11': '11月', '12': '12月',
+};
+---
+
+<BaseLayout title="时间树">
+  <Container>
+    <section class="page-header">
+      <h1 class="page-header__title">时间树</h1>
+      <p class="page-header__subtitle">
+        按时间归档浏览全部观察文章。根据发布时间自动生成年份与月份层级。
+      </p>
+    </section>
+
+    <section class="stack" aria-label="时间归档">
+      {
+        archiveTree.length === 0 ? (
+          <p class="empty-state">暂无已发布文章，归档将在文章发布后自动生成。</p>
+        ) : (
+          <div class="archive-tree">
+            {archiveTree.map((yearNode) => (
+              <div class="archive-year">
+                <div class="archive-year__header">
+                  <a href={withBase(`/archive/${yearNode.year}/`)} class="archive-year__link">
+                    {yearNode.year} 年
+                  </a>
+                  <span class="archive-year__count">{yearNode.count} 篇</span>
+                </div>
+                <ul role="list" class="archive-months">
+                  {yearNode.months.map((monthNode) => (
+                    <li>
+                      <a href={withBase(`/archive/${yearNode.year}/${monthNode.month}/`)} class="archive-month__link">
+                        <span class="archive-month__name">{monthNames[monthNode.month] ?? monthNode.month}</span>
+                        <span class="archive-month__count">{monthNode.count}</span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        )
+      }
+    </section>
+  </Container>
+</BaseLayout>
+
+<style>
+  .archive-tree {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xl);
+  }
+
+  .archive-year__header {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-sm);
+    padding-bottom: var(--space-sm);
+    border-bottom: 2px solid var(--color-brand-border);
+    margin-bottom: var(--space-md);
+  }
+
+  .archive-year__link {
+    font-size: var(--fs-lg);
+    font-weight: var(--fw-semibold);
+    color: var(--color-heading);
+    text-decoration: none;
+  }
+
+  .archive-year__link:hover {
+    color: var(--color-brand);
+  }
+
+  .archive-year__count {
+    font-size: var(--fs-sm);
+    color: var(--color-text-muted);
+  }
+
+  .archive-months {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .archive-month__link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: var(--space-xs) var(--space-md);
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-pill);
+    text-decoration: none;
+    transition: border-color var(--transition-fast);
+  }
+
+  .archive-month__link:hover {
+    border-color: var(--color-brand-border);
+    background-color: var(--color-brand-soft);
+  }
+
+  .archive-month__name {
+    color: var(--color-text);
+    font-size: var(--fs-sm);
+  }
+
+  .archive-month__count {
+    font-size: var(--fs-xs);
+    color: var(--color-text-muted);
+    background-color: var(--color-surface-alt);
+    padding: 0 var(--space-xs);
+    border-radius: var(--radius-sm);
+  }
+
+  .empty-state {
+    padding: var(--space-2xl);
+    text-align: center;
+    color: var(--color-text-muted);
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+  }
+</style>

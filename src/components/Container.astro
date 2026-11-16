@@ -1,0 +1,32 @@
+---
+/**
+ * 页面公共容器组件
+ *
+ * 提供统一的最大宽度与水平内边距，保证全站内容区一致。
+ * 可选 type: 'content'(默认) | 'article'(预留三栏阅读宽度)。
+ */
+interface Props {
+  type?: 'content' | 'article';
+  class?: string;
+}
+
+const { type = 'content', class: className = '' } = Astro.props;
+const widthClass = type === 'article' ? 'container--article' : '';
+---
+
+<div class:list={['container', widthClass, className]}>
+  <slot />
+</div>
+
+<style>
+  .container {
+    width: 100%;
+    max-width: var(--width-content);
+    margin-inline: auto;
+    padding-inline: var(--space-lg);
+  }
+
+  .container--article {
+    max-width: var(--width-article);
+  }
+</style>

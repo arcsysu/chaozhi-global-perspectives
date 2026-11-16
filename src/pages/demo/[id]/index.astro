@@ -1,0 +1,124 @@
+---
+/**
+ * Demo 文章预览详情页 (/demo/[id]/)
+ *
+ * 仅开发环境生成预览页面；生产构建时 getStaticPaths 返回空数组，
+ * 不生成任何 /demo/ 路由页面，确保内部报告不外泄。
+ *
+ * 复用 ArticleLayout 布局，与公开文章详情页保持一致的阅读体验。
+ * 通过 getDemoArticleById 读取 Demo 文章（生产环境返回 null）。
+ *
+ * 双重隔离保障：
+ * 1. content.config.ts 中 demo Collection 在生产 pattern 为空，不加载任何文件。
+ * 2. 本路由 getStaticPaths 在生产返回空数组，不生成页面。
+ * 3. .gitignore 排除 _demo/ 目录，不提交到公开仓库。
+ */
+import { render } from 'astro:content';
+import ArticleLayout from '@/layouts/ArticleLayout.astro';
+import type { ArticleHeadMeta } from '@/layouts/ArticleLayout.astro';
+import {
+  getDemoArticleMetas,
+  getDemoArticleById,
+  getAdjacentDemoArticles,
+} from '@/utils/articles';
+import { withBase } from '@/utils/site';
+
+/**
+ * 预生成 Demo 预览页面。
+ * 生产构建（import.meta.env.PROD）返回空数组，不生成任何页面。
+ * 开发环境返回全部 Demo 文章的路径。
+ */
+export async function getStaticPaths() {
+  if (import.meta.env.PROD) {
+    return [];
+  }
+  const demos = await getDemoArticleMetas();
+  return demos.map((d) => ({
+    params: { id: d.id },
+    props: { id: d.id },
+  }));
+}
+
+interface Props {
+  id: string;
+}
+
+const { id } = Astro.props;
+
+// 生产环境不应到达此处（getStaticPaths 返回空），防御性处理
+if (import.meta.env.PROD) {
+  return Astro.redirect('/404');
+}
+
+const entry = await getDemoArticleById(id);
+if (!entry) {
+  return Astro.redirect('/404');
+}
+
+// 渲染 Markdown 正文，同时获取 headings 数据（用于自动目录）
+const { Content, headings } = await render(entry);
+const data = entry.data;
+
+// 获取上一篇/下一篇导航（Demo 隔离导航，仅开发环境有效）
+const { prev, next } = await getAdjacentDemoArticles(id);
+
+/**
+ * 格式化 ISO 时间为中文显示（本地时区）。
+ */
+function formatTime(iso: string): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+}
+
+/**
+ * sourceType 枚举转中文标签。
+ */
+function sourceTypeLabel(type: typeof data.sourceType): string | undefined {
+  if (!type) return undefined;
+  const labels: Record<string, string> = {
+    'report': '报告',
+    'press-release': '新闻稿',
+    'docx': '文档',
+    'web': '网络资料',
+    'other': '其他',
+  };
+  return labels[type] ?? type;
+}
+
+const sourceTime =
+  data.articleSource === 'agent'
+    ? (data.generatedAt as Date | undefined)?.toISOString() ?? ''
+    : (data.curatedAt as Date | undefined)?.toISOString() ?? '';
+
+const publishedAtIso =
+  (data.publishedAt as Date | undefined)?.toISOString() ?? null;
+
+const meta: ArticleHeadMeta = {
+  title: data.title,
+  summary: data.summary,
+  tags: data.tags,
+  articleSource: data.articleSource,
+  agent: data.agent,
+  sourceTimeLabel: formatTime(sourceTime),
+  sourceTimeIso: sourceTime,
+  publishedAtLabel: publishedAtIso ? formatTime(publishedAtIso) : null,
+  publishedAtIso,
+  sourceTypeLabel: sourceTypeLabel(data.sourceType),
+  isDemo: true,
+};
+---
+
+<ArticleLayout
+  meta={meta}
+  headings={headings}
+  markdownBody={entry.body ?? ''}
+  backHref={withBase('/')}
+  backLabel="返回首页"
+  prev={prev}
+  next={next}
+  linkPrefix={withBase('/demo/')}
+>
+  <Content />
+</ArticleLayout>

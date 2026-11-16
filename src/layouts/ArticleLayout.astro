@@ -1,0 +1,508 @@
+---
+/**
+ * 文章详情页布局 (ArticleLayout) — 第四阶段三栏升级
+ *
+ * 桌面端三栏布局：
+ *   左栏：文章元信息（标签、来源时间、发布时间、Agent/整理来源、资料类型）+ 章节目录
+ *   中栏：标题、摘要、正文（Markdown 渲染）、上一篇/下一篇
+ *   右栏：复制链接按钮、引用来源卡片（脚注提取）
+ *
+ * 顶部固定阅读栏：标题离开视口后出现，显示精简标题 + 阅读进度条。
+ *
+ * 响应式：
+ *   宽屏桌面（≥1024px）：完整三栏
+ *   平板（768–1023px）：双栏（中正文 + 右来源），左栏元信息移入正文头部
+ *   手机（<768px）：单栏，元信息在正文开头，来源回退到文末（GFM 默认渲染）
+ *
+ * 复用已有组件：ArticleTOC、CopyLinkButton、ReadingProgressBar、ArticleNav、ArticleFootnotes。
+ * 不引入 React/Vue/动画库，全部原生 JS + CSS。
+ */
+import BaseLayout from './BaseLayout.astro';
+import ArticleTOC from '@/components/ArticleTOC.astro';
+import type { Heading } from '@/components/ArticleTOC.astro';
+import CopyLinkButton from '@/components/CopyLinkButton.astro';
+import ReadingProgressBar from '@/components/ReadingProgressBar.astro';
+import ArticleNav from '@/components/ArticleNav.astro';
+import ArticleFootnotes from '@/components/ArticleFootnotes.astro';
+import '@/styles/article-prose.css';
+import { withBase } from '@/utils/site';
+
+export interface ArticleHeadMeta {
+  title: string;
+  summary: string;
+  tags: string[];
+  articleSource: 'agent' | 'curated';
+  agent?: string;
+  sourceTimeLabel: string;
+  sourceTimeIso: string;
+  publishedAtLabel: string | null;
+  publishedAtIso: string | null;
+  sourceTypeLabel?: string;
+  isDemo?: boolean;
+}
+
+export interface NavItem {
+  id: string;
+  title: string;
+}
+
+interface Props {
+  meta: ArticleHeadMeta;
+  /** render() 返回的 headings 数据，用于自动目录 */
+  headings?: Heading[];
+  /** 文章 Markdown 源码（entry.body），用于脚注提取 */
+  markdownBody?: string;
+  /** 返回链接 */
+  backHref?: string;
+  backLabel?: string;
+  /** 上一篇/下一篇导航项 */
+  prev?: NavItem | null;
+  next?: NavItem | null;
+  /** 文章详情页链接前缀（/articles/ 或 /demo/） */
+  linkPrefix?: string;
+}
+
+const {
+  meta,
+  headings = [],
+  markdownBody = '',
+  backHref = withBase('/'),
+  backLabel = '返回首页',
+  prev = null,
+  next = null,
+  linkPrefix = '/articles/',
+} = Astro.props;
+
+const isDemo = meta.isDemo ?? false;
+---
+
+<BaseLayout title={meta.title} description={meta.summary}>
+  {/* 固定阅读栏 + 进度条 */}
+  <ReadingProgressBar title={meta.title} backHref={backHref} backLabel={backLabel} />
+
+  {/* 三栏布局容器 */}
+  <div class="article-layout">
+    {/* 左栏：元信息 + 目录 */}
+    <aside class="article-layout__left" aria-label="文章信息">
+      <div class="article-meta-sidebar">
+        {/* 元信息：发布时间 → 资料类型（精简，不显示 Agent/整理时间） */}
+        <dl class="article-meta-sidebar__list">
+          {
+            meta.publishedAtLabel && (
+              <div class="article-meta-sidebar__item">
+                <dt>发布时间</dt>
+                <dd>
+                  <time datetime={meta.publishedAtIso!}>{meta.publishedAtLabel}</time>
+                </dd>
+              </div>
+            )
+          }
+          {
+            meta.sourceTypeLabel && (
+              <div class="article-meta-sidebar__item">
+                <dt>资料类型</dt>
+                <dd>{meta.sourceTypeLabel}</dd>
+              </div>
+            )
+          }
+        </dl>
+
+        {/* 标签（放在资料类型下方，可点击跳转主题合集） */}
+        {
+          meta.tags.length > 0 && (
+            <div class="article-meta-sidebar__tags">
+              {meta.tags.map((tag) => (
+                <a
+                  href={withBase(`/topics/${encodeURIComponent(tag)}/`)}
+                  class="article-meta-sidebar__tag"
+                >
+                  {tag}
+                </a>
+              ))}
+            </div>
+          )
+        }
+
+        {/* 章节目录 */}
+        <ArticleTOC headings={headings} />
+      </div>
+    </aside>
+
+    {/* 中栏：标题 + 摘要 + 正文 + 导航 */}
+    <main class="article-layout__main">
+      {/* 面包屑 + 返回入口 */}
+      <nav class="article-back" aria-label="返回导航">
+        <a href={backHref} class="article-back__link">← {backLabel}</a>
+        {isDemo && <span class="article-back__demo-tag">Demo 预览</span>}
+      </nav>
+
+      {/* 文章头部：移动端元信息（桌面端隐藏，由左栏承担） */}
+      <header class="article-head">
+        <h1 class="article-head__title">{meta.title}</h1>
+        <p class="article-head__summary">{meta.summary}</p>
+
+        {/* 移动端/平板元信息（桌面三栏时隐藏）
+         * 精简：仅发布时间 → 资料类型 → 标签 */}
+        <div class="article-head__mobile-meta">
+          <dl class="article-head__meta">
+            {
+              meta.publishedAtLabel && (
+                <div class="article-head__meta-item">
+                  <dt>发布时间</dt>
+                  <dd>
+                    <time datetime={meta.publishedAtIso!}>{meta.publishedAtLabel}</time>
+                  </dd>
+                </div>
+              )
+            }
+            {
+              meta.sourceTypeLabel && (
+                <div class="article-head__meta-item">
+                  <dt>资料类型</dt>
+                  <dd>{meta.sourceTypeLabel}</dd>
+                </div>
+              )
+            }
+          </dl>
+          {
+            meta.tags.length > 0 && (
+              <div class="article-head__tags">
+                {meta.tags.map((tag) => (
+                  <a
+                    href={withBase(`/topics/${encodeURIComponent(tag)}/`)}
+                    class="article-head__tag"
+                  >
+                    {tag}
+                  </a>
+                ))}
+              </div>
+            )
+          }
+        </div>
+      </header>
+
+      {/* 文章正文（Markdown 渲染） */}
+      <article class="article-prose article-body" id="article-body">
+        <slot />
+      </article>
+
+      {/* 上一篇/下一篇 */}
+      <ArticleNav prev={prev} next={next} linkPrefix={linkPrefix} isDemo={isDemo} />
+    </main>
+
+    {/* 右栏：复制链接 + 引用来源 */}
+    <aside class="article-layout__right" aria-label="辅助信息">
+      <div class="article-aside">
+        <CopyLinkButton />
+
+        {/* 引用来源边注（从 Markdown 脚注提取） */}
+        <ArticleFootnotes markdown={markdownBody} />
+      </div>
+    </aside>
+  </div>
+</BaseLayout>
+
+<script>
+  /**
+   * 图片增强（Task E）：
+   * 1. 为正文所有 <img> 添加 loading="lazy" + decoding="async"（懒加载、防布局偏移）
+   * 2. 将带 title 属性的图片包裹为 <figure> + <figcaption>（图注）
+   * 3. 大表格自动包裹 .table-wrapper（防溢出，窄屏可滚动）
+   */
+  function enhanceArticleBody() {
+    const body = document.getElementById('article-body');
+    if (!body) return;
+
+    // 图片懒加载 + 图注
+    const imgs = body.querySelectorAll('img');
+    imgs.forEach((img) => {
+      // 懒加载：非首屏图片延迟加载
+      if (!img.hasAttribute('loading')) {
+        img.setAttribute('loading', 'lazy');
+      }
+      if (!img.hasAttribute('decoding')) {
+        img.setAttribute('decoding', 'async');
+      }
+
+      // 图注：title 属性转为 figcaption
+      const title = img.getAttribute('title');
+      if (title && img.parentElement?.tagName !== 'FIGURE') {
+        const figure = document.createElement('figure');
+        const figcaption = document.createElement('figcaption');
+        figcaption.textContent = title;
+        img.removeAttribute('title'); // 避免浏览器原生 tooltip 重复
+        img.parentElement?.insertBefore(figure, img);
+        figure.appendChild(img);
+        figure.appendChild(figcaption);
+      }
+    });
+
+    // 大表格自动包裹滚动容器（若未被 Markdown 插件包裹）
+    const tables = body.querySelectorAll('table');
+    tables.forEach((table) => {
+      if (table.parentElement?.classList.contains('table-wrapper')) return;
+      const wrapper = document.createElement('div');
+      wrapper.className = 'table-wrapper';
+      table.parentElement?.insertBefore(wrapper, table);
+      wrapper.appendChild(table);
+    });
+  }
+
+  // DOM 解析完成后执行
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', enhanceArticleBody);
+  } else {
+    enhanceArticleBody();
+  }
+</script>
+
+<style>
+  /* 三栏布局容器 */
+  .article-layout {
+    display: grid;
+    grid-template-columns:
+      minmax(180px, 220px)
+      minmax(0, 1fr)
+      minmax(180px, 240px);
+    gap: var(--space-xl, 32px);
+    max-width: var(--width-content, 72rem);
+    margin-inline: auto;
+    padding-inline: var(--space-lg, 24px);
+    padding-top: var(--space-xl, 32px);
+    align-items: start;
+  }
+
+  /* 左栏：sticky 定位，滚动时跟随 */
+  .article-layout__left {
+    position: sticky;
+    top: calc(var(--height-header, 4rem) + var(--space-lg, 24px));
+    max-height: calc(100vh - var(--height-header, 4rem) - var(--space-xl, 32px));
+    overflow-y: auto;
+  }
+
+  /* 中栏正文宽度限制 */
+  .article-layout__main {
+    min-width: 0;
+    max-width: 720px;
+    margin-inline: auto;
+  }
+
+  /* 右栏：sticky 定位 */
+  .article-layout__right {
+    position: sticky;
+    top: calc(var(--height-header, 4rem) + var(--space-lg, 24px));
+    max-height: calc(100vh - var(--height-header, 4rem) - var(--space-xl, 32px));
+    overflow-y: auto;
+  }
+
+  /* 桌面端隐藏移动端元信息 */
+  .article-head__mobile-meta {
+    display: none;
+  }
+
+  /* 面包屑 */
+  .article-back {
+    padding-bottom: var(--space-md, 16px);
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm, 12px);
+  }
+
+  .article-back__link {
+    font-size: var(--fs-sm, 14px);
+    color: var(--color-text-muted, #767289);
+    text-decoration: none;
+  }
+
+  .article-back__link:hover {
+    color: var(--color-brand, #6d4aff);
+  }
+
+  .article-back__demo-tag {
+    font-size: var(--fs-xs, 12px);
+    padding: var(--space-2xs, 4px) var(--space-sm, 12px);
+    background-color: #fef3c7;
+    color: #92400e;
+    border-radius: var(--radius-sm, 4px);
+    font-weight: var(--fw-medium, 500);
+  }
+
+  /* 文章头部 */
+  .article-head {
+    padding-bottom: var(--space-xl, 32px);
+    border-bottom: 1px solid var(--color-border, #e7e4f2);
+    margin-bottom: var(--space-2xl, 48px);
+  }
+
+  .article-head__title {
+    font-family: var(--font-serif, Georgia, serif);
+    font-size: 2.25rem; /* 36px — 桌面端文章大标题 */
+    font-weight: var(--fw-bold, 700);
+    line-height: var(--lh-tight, 1.2);
+    color: var(--color-heading, #2b2640);
+    letter-spacing: -0.01em;
+    text-wrap: balance; /* 平衡多行长度，避免末行只剩两三字 */
+  }
+
+  .article-head__summary {
+    margin-top: var(--space-md, 16px);
+    font-size: 13px; /* 摘要固定 13px */
+    font-style: italic; /* 摘要斜体，仅作用于文章详情页摘要 */
+    color: var(--color-text-muted, #767289);
+    line-height: 1.6;
+    font-family: var(--font-serif, Georgia, serif);
+  }
+
+  /* 左栏元信息样式 */
+  .article-meta-sidebar__tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs, 8px);
+    margin-bottom: var(--space-lg, 24px);
+  }
+
+  .article-meta-sidebar__tag {
+    font-size: var(--fs-xs, 12px);
+    padding: var(--space-2xs, 4px) var(--space-sm, 12px);
+    background-color: var(--color-brand-soft, #efeaff);
+    color: var(--color-brand-strong, #5a36f0);
+    border-radius: var(--radius-pill, 999px);
+    text-decoration: none;
+    border: 1px solid var(--color-brand-border, #d9ccff);
+  }
+
+  .article-meta-sidebar__tag:hover {
+    background-color: var(--color-brand-border, #d9ccff);
+  }
+
+  .article-meta-sidebar__list {
+    margin: 0 0 var(--space-lg, 24px) 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md, 16px);
+  }
+
+  .article-meta-sidebar__item {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2xs, 4px);
+  }
+
+  .article-meta-sidebar__item dt {
+    font-size: var(--fs-xs, 12px);
+    color: var(--color-text-muted, #767289);
+    font-weight: var(--fw-regular, 400);
+  }
+
+  .article-meta-sidebar__item dd {
+    font-size: var(--fs-sm, 14px);
+    color: var(--color-heading, #2b2640);
+    font-weight: var(--fw-medium, 500);
+    margin: 0;
+  }
+
+  /* 移动端/平板元信息样式（复用旧样式） */
+  .article-head__meta {
+    margin-top: var(--space-lg, 24px);
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-md, 16px) var(--space-xl, 32px);
+  }
+
+  .article-head__meta-item {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2xs, 4px);
+  }
+
+  .article-head__meta-item dt {
+    font-size: var(--fs-xs, 12px);
+    color: var(--color-text-muted, #767289);
+    font-weight: var(--fw-regular, 400);
+  }
+
+  .article-head__meta-item dd {
+    font-size: var(--fs-sm, 14px);
+    color: var(--color-heading, #2b2640);
+    font-weight: var(--fw-medium, 500);
+    margin: 0;
+  }
+
+  .article-head__tags {
+    margin-top: var(--space-lg, 24px);
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs, 8px);
+  }
+
+  .article-head__tag {
+    font-size: var(--fs-xs, 12px);
+    padding: var(--space-2xs, 4px) var(--space-sm, 12px);
+    background-color: var(--color-brand-soft, #efeaff);
+    color: var(--color-brand-strong, #5a36f0);
+    border-radius: var(--radius-pill, 999px);
+    text-decoration: none;
+    border: 1px solid var(--color-brand-border, #d9ccff);
+  }
+
+  .article-head__tag:hover {
+    background-color: var(--color-brand-border, #d9ccff);
+  }
+
+  /* 右栏容器 */
+  .article-aside {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xl, 32px);
+  }
+
+  /* ────────────────────────────────────────
+   * 响应式：平板（768–1023px）双栏
+   * 中正文 + 右来源，左栏元信息移入正文头部
+   * ──────────────────────────────────────── */
+  @media (max-width: 1023px) {
+    .article-layout {
+      grid-template-columns:
+        minmax(0, 1fr)
+        minmax(160px, 220px);
+      gap: var(--space-lg, 24px);
+    }
+
+    .article-layout__left {
+      display: none;
+    }
+
+    /* 平板显示移动端元信息 */
+    .article-head__mobile-meta {
+      display: block;
+    }
+  }
+
+  /* ────────────────────────────────────────
+   * 响应式：手机（<768px）单栏
+   * 元信息在正文开头，来源回退到文末（GFM 默认渲染）
+   * ──────────────────────────────────────── */
+  @media (max-width: 767px) {
+    .article-layout {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0;
+      padding-inline: var(--space-md, 16px);
+    }
+
+    .article-layout__right {
+      display: none;
+    }
+
+    .article-layout__main {
+      max-width: 100%;
+    }
+
+    .article-head__title {
+      font-size: 1.5rem; /* 24px — 移动端标题缩小 */
+    }
+
+    .article-head__summary {
+      font-size: 13px; /* 摘要固定 13px，移动端不变 */
+    }
+  }
+</style>

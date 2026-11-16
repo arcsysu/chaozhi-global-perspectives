@@ -1,0 +1,117 @@
+---
+/**
+ * 文章详情页 (/articles/[id]/)
+ *
+ * 展示单篇已发布文章的完整内容：标题、摘要、标签、来源时间、
+ * 发布时间、内容来源、Markdown 正文（多级标题、段落、列表、链接、
+ * 粗体、引用、表格、图片、脚注等）。
+ *
+ * 文章 ID = 文章文件夹名（稳定的文件夹标识），由 content.config.ts
+ * 的 generateId 生成，与文件路径解耦。
+ *
+ * 通过 getStaticPaths 预生成所有已发布文章的静态页面；
+ * 不存在的文章 ID 不会生成页面，由站点 404 兜底。
+ * 页面内额外做 null 防御，异常时 Astro.response 404。
+ *
+ * 复用 ArticleLayout 布局，为第四阶段三栏升级保留组件边界。
+ */
+import { render } from 'astro:content';
+import ArticleLayout from '@/layouts/ArticleLayout.astro';
+import {
+  getPublishedArticles,
+  getArticleById,
+  getAdjacentArticles,
+} from '@/utils/articles';
+import type { ArticleHeadMeta } from '@/layouts/ArticleLayout.astro';
+import { withBase } from '@/utils/site';
+
+/**
+ * 预生成所有已发布文章的详情页。
+ * 仅 approved 且有 publishedAt 的文章进入路径列表。
+ */
+export async function getStaticPaths() {
+  const articles = await getPublishedArticles();
+  return articles.map((a) => ({
+    params: { id: a.id },
+    props: { id: a.id },
+  }));
+}
+
+interface Props {
+  id: string;
+}
+
+const { id } = Astro.props;
+const entry = await getArticleById(id);
+
+// 防御性 404：getStaticPaths 已保证路径有效，此处兜底异常情况
+if (!entry) {
+  return Astro.redirect('/404');
+}
+
+// 渲染 Markdown 正文为 Content 组件，同时获取 headings 数据（用于自动目录）
+const { Content, headings } = await render(entry);
+const data = entry.data;
+
+// 获取上一篇/下一篇导航
+const { prev, next } = await getAdjacentArticles(id);
+
+/**
+ * 格式化 ISO 时间为中文显示（本地时区）。
+ * 形如 "2026年11月15日"。
+ */
+function formatTime(iso: string): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+}
+
+/**
+ * sourceType 枚举转中文标签。
+ */
+function sourceTypeLabel(type: typeof data.sourceType): string | undefined {
+  if (!type) return undefined;
+  const labels: Record<string, string> = {
+    'report': '报告',
+    'press-release': '新闻稿',
+    'docx': '文档',
+    'web': '网络资料',
+    'other': '其他',
+  };
+  return labels[type] ?? type;
+}
+
+// 构建 ArticleLayout 所需的头部元数据
+const sourceTime =
+  data.articleSource === 'agent'
+    ? (data.generatedAt as Date | undefined)?.toISOString() ?? ''
+    : (data.curatedAt as Date | undefined)?.toISOString() ?? '';
+
+const publishedAtIso = (data.publishedAt as Date | undefined)?.toISOString() ?? null;
+
+const meta: ArticleHeadMeta = {
+  title: data.title,
+  summary: data.summary,
+  tags: data.tags,
+  articleSource: data.articleSource,
+  agent: data.agent,
+  sourceTimeLabel: formatTime(sourceTime),
+  sourceTimeIso: sourceTime,
+  publishedAtLabel: publishedAtIso ? formatTime(publishedAtIso) : null,
+  publishedAtIso,
+  sourceTypeLabel: sourceTypeLabel(data.sourceType),
+  isDemo: false,
+};
+---
+
+<ArticleLayout
+  meta={meta}
+  headings={headings}
+  markdownBody={entry.body ?? ''}
+  prev={prev}
+  next={next}
+  linkPrefix={withBase('/articles/')}
+>
+  <Content />
+</ArticleLayout>

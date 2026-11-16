@@ -1,0 +1,98 @@
+---
+/**
+ * 公共页面布局 Layout
+ *
+ * 整合全局样式（reset + global）、Header、页面主内容区、Footer。
+ * 提供页面级元信息：title、description、canonical 等。
+ *
+ * 用法：
+ * <Layout title="首页">
+ *   <页面内容 />
+ * </Layout>
+ */
+import '../styles/reset.css';
+import '../styles/global.css';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import { site, withBase } from '../utils/site';
+
+interface Props {
+  title?: string;
+  description?: string;
+  /** 是否在 title 后追加站点名（默认 true） */
+  appendSiteName?: boolean;
+}
+
+const {
+  title,
+  description = site.description,
+  appendSiteName = true,
+} = Astro.props;
+
+const pageTitle = title
+  ? appendSiteName
+    ? `${title} · ${site.name}`
+    : title
+  : `${site.name} — ${site.slogan}`;
+
+const canonical = new URL(Astro.url.pathname, Astro.site ?? Astro.url);
+---
+
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="generator" content={Astro.generator} />
+
+    <title>{pageTitle}</title>
+    <meta name="description" content={description} />
+
+    <!-- 主题色：延续品牌紫，移动端浏览器地址栏配色 -->
+    <meta name="theme-color" content="#6d4aff" />
+
+    <link rel="canonical" href={canonical.href} />
+    <link rel="icon" type="image/svg+xml" href={withBase('/favicon.svg')} />
+
+    <!-- Open Graph 基础（静态，后续文章页可覆盖） -->
+    <meta property="og:site_name" content={site.name} />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="zh_CN" />
+  </head>
+
+  <body>
+    <a href="#main-content" class="skip-link">跳到主要内容</a>
+    <Header />
+    <main id="main-content" class="main">
+      <slot />
+    </main>
+    <Footer />
+  </body>
+</html>
+
+<style>
+  /* 跳转链接：无障碍，默认隐藏，聚焦时显现 */
+  .skip-link {
+    position: absolute;
+    left: 50%;
+    top: -3rem;
+    transform: translateX(-50%);
+    z-index: var(--z-overlay);
+    padding: var(--space-sm) var(--space-md);
+    background-color: var(--color-brand);
+    color: var(--color-text-invert);
+    border-radius: var(--radius-md);
+    font-size: var(--fs-sm);
+    transition: top var(--transition-fast);
+  }
+
+  .skip-link:focus {
+    top: var(--space-sm);
+  }
+
+  .main {
+    min-height: calc(100vh - var(--height-header) - 12rem);
+  }
+</style>

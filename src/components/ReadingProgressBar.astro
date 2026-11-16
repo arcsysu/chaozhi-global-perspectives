@@ -1,0 +1,235 @@
+---
+/**
+ * 固定阅读栏 + 阅读进度条 (ReadingProgressBar) — Header 切换模式
+ *
+ * 参考 Quanta Magazine 交互：
+ * - 文章大标题可见时：显示正常网站 Header，阅读栏隐藏。
+ * - 文章大标题离开视口后：Header 视觉隐藏，阅读栏滑入。
+ * - 用户向上滚动重新看到标题时：恢复正常 Header。
+ *
+ * 精简阅读栏：
+ * - 左侧缩小的 YatCC Logo 占位 + 当前文章标题（单行截断）。
+ * - 高度约 48–56px（与 Header 一致，避免布局跳动）。
+ * - 底部 2–3px 紫色阅读进度线。
+ *
+ * 实现：
+ * - IntersectionObserver 监测文章标题可见性。
+ * - 切换 body.reading-mode 类：隐藏 Header、显示阅读栏。
+ * - requestAnimationFrame 节流滚动计算进度。
+ * - 进度范围仅文章正文（.article-body），不含页底导航和 Footer。
+ * - 兼容 prefers-reduced-motion、移动端、窗口尺寸变化。
+ * - 锚点跳转偏移由 CSS scroll-margin-top 处理。
+ */
+
+interface Props {
+  /** 文章标题 */
+  title: string;
+  /** 返回链接 */
+  backHref: string;
+  backLabel: string;
+}
+
+const { title, backHref, backLabel } = Astro.props;
+---
+
+<div class="reading-bar" id="reading-bar" aria-hidden="true" hidden>
+  <div class="reading-bar__inner">
+    <a href={backHref} class="reading-bar__logo" aria-label={backLabel}>
+      {/* 缩小的 YatCC Logo 占位 */}
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <line x1="19" y1="12" x2="5" y2="12"></line>
+        <polyline points="12 19 5 12 12 5"></polyline>
+      </svg>
+    </a>
+    <span class="reading-bar__title" title={title}>{title}</span>
+  </div>
+  <div class="reading-bar__progress-track">
+    <div class="reading-bar__progress-fill" id="reading-progress-fill"></div>
+  </div>
+</div>
+
+<script>
+  // ──────────────────────────────────────────────
+  // Header ↔ 阅读栏切换 + 进度条更新
+  // ──────────────────────────────────────────────
+
+  const readingBar = document.getElementById('reading-bar');
+  const progressFill = document.getElementById('reading-progress-fill');
+  const articleTitle = document.querySelector<HTMLElement>('.article-head__title');
+  const articleBody = document.querySelector<HTMLElement>('.article-body');
+
+  if (readingBar && articleTitle && articleBody) {
+    let barVisible = false;
+    let ticking = false;
+
+    // 用 IntersectionObserver 监测文章标题可见性
+    // 标题完全离开视口顶部时切换为阅读栏
+    const titleObserver = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          // 标题离开视口顶部（boundingClientRect.top < 0）时显示阅读栏
+          const shouldShow = !entry.isIntersecting && entry.boundingClientRect.top < 0;
+          if (shouldShow !== barVisible) {
+            barVisible = shouldShow;
+            // 切换 body 类：隐藏 Header、显示阅读栏
+            document.body.classList.toggle('reading-mode', shouldShow);
+            readingBar.hidden = !shouldShow;
+            readingBar.setAttribute('aria-hidden', String(!shouldShow));
+          }
+        }
+      },
+      { rootMargin: '0px', threshold: 0 },
+    );
+    titleObserver.observe(articleTitle);
+
+    // 计算并更新进度条
+    function updateProgress(): void {
+      if (!progressFill || !articleBody) return;
+      const rect = articleBody.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
+      // 正文顶部到视口顶部的距离（负数表示已滚入视口上方）
+      const scrolled = Math.max(0, -rect.top);
+      // 总可滚动距离 = 正文高度 - 视口高度
+      const totalScrollable = Math.max(1, rect.height - viewportHeight);
+      const progress = Math.min(1, Math.max(0, scrolled / totalScrollable));
+      progressFill.style.transform = `scaleX(${progress})`;
+      ticking = false;
+    }
+
+    function onScroll(): void {
+      if (!ticking) {
+        window.requestAnimationFrame(updateProgress);
+        ticking = true;
+      }
+    }
+
+    // 初始更新一次
+    updateProgress();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', updateProgress, { passive: true });
+  }
+</script>
+
+<style>
+  /* 阅读栏：固定定位，与 Header 同高，初始隐藏 */
+  .reading-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: var(--z-header, 100);
+    background-color: var(--color-surface, #ffffff);
+    box-shadow: var(--shadow-header-float, 0 2px 12px rgba(43, 38, 64, 0.08));
+    transform: translateY(-100%);
+    transition: transform var(--transition-base, 250ms ease);
+  }
+
+  .reading-bar[hidden] {
+    display: none;
+  }
+
+  /* 阅读栏可见时滑入 */
+  .reading-bar:not([hidden]) {
+    transform: translateY(0);
+  }
+
+  .reading-bar__inner {
+    max-width: var(--width-content, 72rem);
+    margin-inline: auto;
+    padding-inline: var(--space-lg, 24px);
+    height: var(--height-header, 4rem); /* 与 Header 同高，避免布局跳动 */
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm, 12px);
+  }
+
+  .reading-bar__logo {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-sm, 4px);
+    color: var(--color-brand, #6d4aff);
+    flex-shrink: 0;
+    text-decoration: none;
+  }
+
+  .reading-bar__logo:hover {
+    background-color: var(--color-brand-soft, #efeaff);
+  }
+
+  .reading-bar__title {
+    font-family: var(--font-serif, Georgia, serif);
+    font-size: var(--fs-sm, 14px);
+    font-weight: var(--fw-medium, 500);
+    color: var(--color-heading, #2b2640);
+    line-height: var(--lh-tight, 1.2);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .reading-bar__progress-track {
+    height: 3px;
+    background-color: var(--color-border, #e7e4f2);
+    overflow: hidden;
+  }
+
+  .reading-bar__progress-fill {
+    height: 100%;
+    background-color: var(--color-brand, #6d4aff);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 50ms linear;
+  }
+
+  /* 移动端：阅读栏更紧凑 */
+  @media (max-width: 767px) {
+    .reading-bar__inner {
+      height: var(--height-header-mobile, 3.5rem);
+      padding-inline: var(--space-md, 16px);
+    }
+
+    .reading-bar__title {
+      font-size: var(--fs-xs, 12px);
+    }
+  }
+
+  /* 尊重 prefers-reduced-motion：禁用过渡 */
+  @media (prefers-reduced-motion: reduce) {
+    .reading-bar {
+      transition: none;
+    }
+
+    .reading-bar__progress-fill {
+      transition: none;
+    }
+  }
+</style>
+
+<!-- 全局样式：reading-mode 下隐藏 Header -->
+<style is:global>
+  /* 阅读模式：Header 视觉隐藏（不占顶部空间），由阅读栏替代 */
+  body.reading-mode #site-header {
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity var(--transition-fast, 150ms ease);
+  }
+
+  /* 平滑过渡 */
+  #site-header {
+    transition: opacity var(--transition-fast, 150ms ease);
+  }
+</style>

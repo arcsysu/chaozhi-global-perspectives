@@ -1,0 +1,401 @@
+---
+/**
+ * 网站 Header + 顶部导航
+ *
+ * 布局（桌面，单行）：
+ * [YatCC Logo] 超智全球视野 | 简介    首页 主题 时间树 关于我们    [搜索]
+ *
+ * 布局（移动）：
+ * [Logo] 超智全球视野 [搜索] [汉堡]
+ *        └─ 折叠面板：首页 主题 时间树 关于我们
+ *
+ * 实现：
+ * - 当前栏目：比较 Astro.url.pathname 与 navItem.matchPrefix，命中时下方加紫色细线 + aria-current。
+ * - 移动端折叠：极少量原生 JS（island 内联脚本），无外部依赖。
+ * - 搜索：点击搜索图标展开 SearchPanel 下拉，标题搜索（静态 JSON 索引 + 原生 JS）。
+ *   ESC 关闭、焦点管理、移动端全宽，详见 SearchPanel.astro。
+ * - 语义标签：<header><nav><ul><li><a>，配合 aria 属性满足键盘与无障碍。
+ */
+import Logo from './Logo.astro';
+import SearchPanel from './SearchPanel.astro';
+import { site, navItems, withBase } from '../utils/site';
+
+// 计算 BASE_URL（去除末尾斜杠），注入到搜索触发按钮的 data-base 供 JS 读取
+const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, '') || '/';
+
+// 计算当前路径，用于高亮判断。统一去除末尾斜杠便于前缀匹配。
+const pathname = Astro.url.pathname.replace(/\/$/, '') || '/';
+
+function isActive(item: (typeof navItems)[number]): boolean {
+  const prefix = (item.matchPrefix ?? item.path).replace(/\/$/, '') || '/';
+  if (prefix === '/') {
+    return pathname === '/';
+  }
+  return pathname === prefix || pathname.startsWith(prefix + '/');
+}
+---
+
+<header class="header" id="site-header">
+  <div class="container header__inner">
+    <!-- 左：品牌区（Logo + 名称 + 简介） -->
+    <a href={withBase('/')} class="header__brand" aria-label={`${site.team} ${site.name} 首页`}>
+      <Logo size={36} />
+      <span class="header__brand-text">
+        <span class="header__site-name">{site.name}</span>
+        <span class="header__brief">{site.brief}</span>
+      </span>
+    </a>
+
+    <!-- 中：主导航（桌面可见） -->
+    <nav class="header__nav" aria-label="主导航">
+      <ul role="list" class="header__nav-list">
+        {
+          navItems.map((item) => (
+            <li>
+              <a
+                href={withBase(item.path)}
+                class:list={['header__nav-link', { 'is-active': isActive(item) }]}
+                aria-current={isActive(item) ? 'page' : undefined}
+              >
+                {item.label}
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </nav>
+
+    <!-- 右：搜索 + 移动端菜单按钮 -->
+    <div class="header__actions">
+      <button
+        type="button"
+        class="header__search"
+        id="search-trigger"
+        aria-label="搜索文章"
+        aria-haspopup="dialog"
+        aria-expanded="false"
+        data-base={baseUrl}
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <circle cx="11" cy="11" r="7"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+      </button>
+
+      <button
+        type="button"
+        class="header__toggle"
+        aria-label="展开导航菜单"
+        aria-expanded="false"
+        aria-controls="mobile-nav"
+      >
+        <span class="visually-hidden">菜单</span>
+        <span class="header__toggle-icon" aria-hidden="true"></span>
+      </button>
+    </div>
+  </div>
+
+  <!-- 搜索面板（下拉覆盖层） -->
+  <SearchPanel />
+
+  <!-- 移动端折叠导航面板 -->
+  <nav class="mobile-nav" id="mobile-nav" aria-label="移动导航" hidden>
+    <ul role="list" class="mobile-nav__list">
+      {
+        navItems.map((item) => (
+          <li>
+            <a
+              href={withBase(item.path)}
+              class:list={['mobile-nav__link', { 'is-active': isActive(item) }]}
+              aria-current={isActive(item) ? 'page' : undefined}
+            >
+              {item.label}
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </nav>
+</header>
+
+<script>
+  // 移动端导航折叠交互（原生 JS，无依赖）
+  const toggle = document.querySelector<HTMLButtonElement>('.header__toggle');
+  const panel = document.getElementById('mobile-nav');
+
+  // 搜索触发按钮 aria-expanded 同步（SearchPanel 控制面板开合，此处仅同步按钮状态）
+  const searchTrigger = document.getElementById('search-trigger');
+  const searchPanel = document.getElementById('search-panel');
+  if (searchTrigger && searchPanel) {
+    // 使用 MutationObserver 监听 panel 的 hidden 属性变化，同步按钮 aria-expanded
+    const observer = new MutationObserver(() => {
+      searchTrigger.setAttribute('aria-expanded', String(!searchPanel.hidden));
+    });
+    observer.observe(searchPanel, { attributes: true, attributeFilter: ['hidden'] });
+  }
+
+  if (toggle && panel) {
+    toggle.addEventListener('click', () => {
+      const expanded = toggle.getAttribute('aria-expanded') === 'true';
+      toggle.setAttribute('aria-expanded', String(!expanded));
+      toggle.setAttribute('aria-label', expanded ? '展开导航菜单' : '收起导航菜单');
+      panel.hidden = expanded;
+    });
+
+    // 点击导航链接后自动收起
+    panel.querySelectorAll('a').forEach((link) => {
+      link.addEventListener('click', () => {
+        toggle.setAttribute('aria-expanded', 'false');
+        toggle.setAttribute('aria-label', '展开导航菜单');
+        panel.hidden = true;
+      });
+    });
+
+    // ESC 关闭
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !panel.hidden) {
+        toggle.setAttribute('aria-expanded', 'false');
+        toggle.setAttribute('aria-label', '展开导航菜单');
+        panel.hidden = true;
+        toggle.focus();
+      }
+    });
+  }
+</script>
+
+<style>
+  .header {
+    position: sticky;
+    top: 0;
+    z-index: var(--z-header);
+    background-color: var(--color-surface);
+    box-shadow: var(--shadow-header);
+  }
+
+  .header__inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-lg);
+    min-height: var(--height-header);
+  }
+
+  /* 品牌区 */
+  .header__brand {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    flex-shrink: 0;
+  }
+
+  .header__brand-text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.25;
+  }
+
+  .header__site-name {
+    font-family: var(--font-display);
+    font-size: var(--fs-md);
+    font-weight: var(--fw-semibold);
+    color: var(--color-heading);
+  }
+
+  .header__brief {
+    font-size: var(--fs-xs);
+    color: var(--color-text-muted);
+    white-space: nowrap;
+  }
+
+  /* 主导航 */
+  .header__nav {
+    margin-inline: auto;
+  }
+
+  .header__nav-list {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xl);
+  }
+
+  .header__nav-link {
+    position: relative;
+    display: inline-block;
+    padding-block: var(--space-sm);
+    color: var(--color-text);
+    font-size: var(--fs-base);
+    font-weight: var(--fw-medium);
+    transition: color var(--transition-fast);
+  }
+
+  .header__nav-link:hover {
+    color: var(--color-brand);
+  }
+
+  /* 当前栏目：下方紫色细线 */
+  .header__nav-link.is-active {
+    color: var(--color-brand);
+  }
+
+  .header__nav-link.is-active::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 2px;
+    background-color: var(--color-nav-active);
+    border-radius: 1px;
+  }
+
+  /* 操作区 */
+  .header__actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    flex-shrink: 0;
+  }
+
+  .header__search {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-md);
+    color: var(--color-text-muted);
+    transition:
+      color var(--transition-fast),
+      background-color var(--transition-fast);
+  }
+
+  .header__search:hover {
+    color: var(--color-brand);
+    background-color: var(--color-brand-soft);
+  }
+
+  .header__search[aria-expanded='true'] {
+    color: var(--color-brand);
+    background-color: var(--color-brand-soft);
+  }
+
+  /* 汉堡按钮（仅移动端） */
+  .header__toggle {
+    display: none;
+    width: 40px;
+    height: 40px;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-md);
+    color: var(--color-heading);
+  }
+
+  .header__toggle-icon,
+  .header__toggle-icon::before,
+  .header__toggle-icon::after {
+    display: block;
+    width: 20px;
+    height: 2px;
+    background-color: currentColor;
+    border-radius: 1px;
+    transition: transform var(--transition-fast);
+  }
+
+  .header__toggle-icon {
+    position: relative;
+  }
+
+  .header__toggle-icon::before,
+  .header__toggle-icon::after {
+    content: '';
+    position: absolute;
+    left: 0;
+  }
+
+  .header__toggle-icon::before {
+    top: -6px;
+  }
+
+  .header__toggle-icon::after {
+    top: 6px;
+  }
+
+  .header__toggle[aria-expanded='true'] .header__toggle-icon {
+    background-color: transparent;
+  }
+
+  .header__toggle[aria-expanded='true'] .header__toggle-icon::before {
+    transform: translateY(6px) rotate(45deg);
+  }
+
+  .header__toggle[aria-expanded='true'] .header__toggle-icon::after {
+    transform: translateY(-6px) rotate(-45deg);
+  }
+
+  /* 移动端折叠面板 */
+  .mobile-nav {
+    display: none;
+    background-color: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+    box-shadow: var(--shadow-header-float);
+  }
+
+  .mobile-nav__list {
+    display: flex;
+    flex-direction: column;
+    padding: var(--space-sm) var(--space-md);
+  }
+
+  .mobile-nav__link {
+    display: block;
+    padding-block: var(--space-md);
+    color: var(--color-text);
+    font-size: var(--fs-base);
+    font-weight: var(--fw-medium);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .mobile-nav__link:last-child {
+    border-bottom: none;
+  }
+
+  .mobile-nav__link.is-active {
+    color: var(--color-brand);
+    font-weight: var(--fw-semibold);
+  }
+
+  /* 响应式：≤768px 切换为移动导航 */
+  @media (max-width: 768px) {
+    .header__inner {
+      min-height: var(--height-header-mobile);
+      gap: var(--space-sm);
+    }
+
+    .header__brief {
+      display: none;
+    }
+
+    .header__nav {
+      display: none;
+    }
+
+    .header__toggle {
+      display: inline-flex;
+    }
+
+    .mobile-nav {
+      display: block;
+    }
+  }
+</style>

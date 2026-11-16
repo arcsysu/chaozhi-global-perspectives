@@ -1,0 +1,198 @@
+---
+/**
+ * 文章卡片组件
+ *
+ * 展示单篇文章的标题、摘要、时间及可选左侧缩略图。
+ * 被首页、主题合集、时间归档、搜索结果共用。
+ *
+ * 布局：
+ * - 有缩略图：[左缩略图 120×80] [右：标题 / 摘要 / 时间]
+ * - 无缩略图：纯文字单栏（标题 / 摘要 / 时间），不显示图片占位
+ *
+ * 首页不显示标签；其他页面可通过 showTags 控制是否展示标签。
+ */
+import { withBase } from '@/utils/site';
+
+interface Props {
+  id: string;
+  title: string;
+  summary: string;
+  /** 发布时间或来源时间（ISO UTC 字符串），用于显示 */
+  dateLabel: string;
+  /** 原始 ISO 时间，用于 <time datetime> */
+  dateIso: string;
+  coverImage: string | null;
+  /** 是否显示标签（首页不显示，主题/归档页可选） */
+  showTags?: boolean;
+  tags?: string[];
+  /** 文章详情页链接前缀，默认 /articles/ */
+  linkPrefix?: string;
+  /** Demo 标记（开发环境预览用） */
+  isDemo?: boolean;
+}
+
+const {
+  id,
+  title,
+  summary,
+  dateLabel,
+  dateIso,
+  coverImage,
+  showTags = false,
+  tags = [],
+  linkPrefix = '/articles/',
+  isDemo = false,
+} = Astro.props;
+
+const articleHref = withBase(`${linkPrefix}${id}/`);
+---
+
+<article class:list={['article-card', { 'article-card--has-image': coverImage }]}>
+  {
+    coverImage && (
+      <a href={articleHref} class="article-card__thumb" aria-label={title} tabindex="-1">
+        <img src={coverImage} alt="" loading="lazy" width="120" height="80" />
+      </a>
+    )
+  }
+
+  <div class="article-card__body">
+    <h3 class="article-card__title">
+      <a href={articleHref}>
+        {isDemo && <span class="article-card__demo-badge">Demo</span>}
+        {title}
+      </a>
+    </h3>
+    <p class="article-card__summary">{summary}</p>
+    <div class="article-card__meta">
+      <time datetime={dateIso}>{dateLabel}</time>
+      {showTags && tags.length > 0 && (
+        <span class="article-card__tags">
+          {tags.map((t) => (
+            <a href={withBase(`/topics/${encodeURIComponent(t)}/`)} class="article-card__tag">{t}</a>
+          ))}
+        </span>
+      )}
+    </div>
+  </div>
+</article>
+
+<style>
+  .article-card {
+    display: flex;
+    gap: var(--space-md);
+    padding-block: var(--space-lg);
+    align-items: flex-start;
+  }
+
+  /* 缩略图 */
+  .article-card__thumb {
+    flex-shrink: 0;
+    width: 120px;
+    height: 80px;
+    overflow: hidden;
+    border-radius: var(--radius-md);
+    background-color: var(--color-surface-alt);
+    display: block;
+  }
+
+  .article-card__thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  /* 正文区 */
+  .article-card__body {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .article-card__title {
+    font-size: var(--fs-md);
+    font-weight: var(--fw-semibold);
+    line-height: var(--lh-snug);
+    margin: 0;
+  }
+
+  .article-card__title a {
+    color: var(--color-heading);
+    text-decoration: none;
+  }
+
+  .article-card__title a:hover {
+    color: var(--color-brand);
+  }
+
+  .article-card__summary {
+    margin-top: var(--space-xs);
+    font-size: var(--fs-sm);
+    color: var(--color-text-muted);
+    line-height: var(--lh-normal);
+    /* 限制 2-3 行，超出省略 */
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .article-card__meta {
+    margin-top: var(--space-xs);
+    font-size: var(--fs-xs);
+    color: var(--color-text-muted);
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    flex-wrap: wrap;
+  }
+
+  .article-card__tags {
+    display: inline-flex;
+    gap: var(--space-2xs);
+    flex-wrap: wrap;
+  }
+
+  .article-card__tag {
+    color: var(--color-brand);
+    text-decoration: none;
+    padding: var(--space-2xs) var(--space-sm);
+    background-color: var(--color-brand-soft);
+    border-radius: var(--radius-pill);
+    font-size: var(--fs-xs);
+  }
+
+  .article-card__tag:hover {
+    background-color: var(--color-brand-border);
+    color: var(--color-brand-strong);
+  }
+
+  .article-card__demo-badge {
+    display: inline-block;
+    margin-right: var(--space-2xs);
+    padding: var(--space-2xs) var(--space-xs);
+    background-color: #fef3c7;
+    color: #92400e;
+    border-radius: var(--radius-sm);
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-medium);
+    vertical-align: middle;
+  }
+
+  /* 无图时移除缩略图区域间距 */
+  .article-card:not(.article-card--has-image) {
+    padding-block: var(--space-lg);
+  }
+
+  /* 移动端：缩略图缩小 */
+  @media (max-width: 640px) {
+    .article-card__thumb {
+      width: 88px;
+      height: 64px;
+    }
+
+    .article-card {
+      gap: var(--space-sm);
+    }
+  }
+</style>

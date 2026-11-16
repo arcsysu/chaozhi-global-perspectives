@@ -1,0 +1,97 @@
+---
+/**
+ * 文章列表组件
+ *
+ * 接收文章元数据数组，渲染单列文章卡片列表，带细分隔线。
+ * 被首页、主题合集、时间归档、搜索结果共用。
+ *
+ * 文章之间采用适当留白和细分隔线，单列线性排列。
+ * 支持分页：通过 limit 控制每页显示数量，超过则截断。
+ */
+import ArticleCard from './ArticleCard.astro';
+import type { ArticleMeta, DemoArticleMeta } from '@/utils/articles';
+
+interface Props {
+  articles: ArticleMeta[] | DemoArticleMeta[];
+  /** 每页显示数量，0 或不传表示全部 */
+  limit?: number;
+  /** 是否显示标签（首页不显示） */
+  showTags?: boolean;
+  /** 文章详情页链接前缀 */
+  linkPrefix?: string;
+  /** 空状态提示文本 */
+  emptyText?: string;
+}
+
+const {
+  articles,
+  limit = 0,
+  showTags = false,
+  linkPrefix = '/articles/',
+  emptyText = '暂无文章',
+} = Astro.props;
+
+const list = limit > 0 ? articles.slice(0, limit) : articles;
+
+/** 格式化日期为中文显示 */
+function formatDate(iso: string): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+}
+---
+
+{
+  list.length === 0 ? (
+    <p class="article-list__empty">{emptyText}</p>
+  ) : (
+    <section class="article-list" aria-label="文章列表">
+      {list.map((article) => {
+        const isDemo = 'internal' in article && (article as DemoArticleMeta).internal;
+        return (
+          <ArticleCard
+            id={article.id}
+            title={article.title}
+            summary={article.summary}
+            dateLabel={formatDate(
+              'publishedAt' in article ? article.publishedAt : (article as DemoArticleMeta).sourceTime
+            )}
+            dateIso={'publishedAt' in article ? article.publishedAt : (article as DemoArticleMeta).sourceTime}
+            coverImage={article.coverImage}
+            showTags={showTags}
+            tags={article.tags}
+            linkPrefix={linkPrefix}
+            isDemo={isDemo}
+          />
+        );
+      })}
+    </section>
+  )
+}
+
+<style>
+  .article-list {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* 文章之间的细分隔线 */
+  .article-list :global(.article-card) {
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .article-list :global(.article-card:last-child) {
+    border-bottom: none;
+  }
+
+  .article-list__empty {
+    padding: var(--space-3xl) var(--space-lg);
+    text-align: center;
+    color: var(--color-text-muted);
+    font-size: var(--fs-md);
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+  }
+</style>

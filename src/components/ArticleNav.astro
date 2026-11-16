@@ -1,0 +1,151 @@
+---
+/**
+ * 文章底部导航 (ArticleNav)
+ *
+ * 简洁的"下一篇文章"右箭头风格：
+ * - 仅展示下一篇（按 publishedAt 排序，ID 次级排序保证稳定）
+ * - 小标题"继续阅读" + 下一篇文章标题 + 右箭头
+ * - 无下一篇时隐藏整个区域
+ *
+ * Demo 文章使用隔离的本地预览导航（linkPrefix=/demo/），不泄露到生产。
+ */
+import { withBase } from '@/utils/site';
+
+interface NavItem {
+  id: string;
+  title: string;
+}
+
+interface Props {
+  /** 上一篇（保留接口兼容，当前不展示） */
+  prev?: NavItem | null;
+  /** 下一篇 */
+  next: NavItem | null;
+  /** 文章详情页链接前缀（公开 /articles/ 或 Demo /demo/） */
+  linkPrefix: string;
+  /** 是否 Demo 预览 */
+  isDemo?: boolean;
+}
+
+const { next, linkPrefix, isDemo = false } = Astro.props;
+
+function buildHref(id: string): string {
+  return withBase(`${linkPrefix}${encodeURIComponent(id)}/`);
+}
+---
+
+{
+  next && (
+    <nav class="article-nav" aria-label={isDemo ? 'Demo 下一篇文章' : '下一篇文章'}>
+      <a href={buildHref(next.id)} class="article-nav__link">
+        <span class="article-nav__label">继续阅读</span>
+        <span class="article-nav__title" title={next.title}>
+          {next.title}
+        </span>
+        <svg
+          class="article-nav__arrow"
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <line x1="5" y1="12" x2="19" y2="12" />
+          <polyline points="12 5 19 12 12 19" />
+        </svg>
+      </a>
+    </nav>
+  )
+}
+
+<style>
+  .article-nav {
+    margin-top: var(--space-3xl, 4rem);
+    padding-top: var(--space-xl, 2rem);
+    border-top: 1px solid var(--color-border, #e7e4f2);
+  }
+
+  .article-nav__link {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md, 16px);
+    padding: var(--space-lg, 24px) var(--space-xl, 32px);
+    background-color: var(--color-surface, #ffffff);
+    border: 1px solid var(--color-border, #e7e4f2);
+    border-radius: var(--radius-md, 8px);
+    text-decoration: none;
+    transition:
+      border-color var(--transition-fast, 150ms ease),
+      background-color var(--transition-fast, 150ms ease);
+  }
+
+  .article-nav__link:hover {
+    border-color: var(--color-brand-border, #d9ccff);
+    background-color: var(--color-brand-soft, #efeaff);
+  }
+
+  .article-nav__label {
+    flex-shrink: 0;
+    font-size: var(--fs-xs, 13px);
+    color: var(--color-text-muted, #767289);
+    font-weight: var(--fw-medium, 500);
+    letter-spacing: 0.02em;
+  }
+
+  .article-nav__title {
+    flex: 1;
+    font-family: var(--font-serif, Georgia, serif);
+    font-size: var(--fs-sm, 15px);
+    color: var(--color-heading, #2b2640);
+    font-weight: var(--fw-semibold, 600);
+    line-height: var(--lh-snug, 1.4);
+    /* 单行截断 */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    transition: color var(--transition-fast, 150ms ease);
+  }
+
+  .article-nav__link:hover .article-nav__title {
+    color: var(--color-brand, #6d4aff);
+  }
+
+  .article-nav__arrow {
+    flex-shrink: 0;
+    color: var(--color-text-muted, #767289);
+    transition:
+      color var(--transition-fast, 150ms ease),
+      transform var(--transition-fast, 150ms ease);
+  }
+
+  .article-nav__link:hover .article-nav__arrow {
+    color: var(--color-brand, #6d4aff);
+    transform: translateX(4px);
+  }
+
+  @media (max-width: 768px) {
+    .article-nav__link {
+      padding: var(--space-md, 16px) var(--space-lg, 24px);
+      gap: var(--space-sm, 12px);
+    }
+
+    .article-nav__title {
+      font-size: var(--fs-xs, 14px);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .article-nav__arrow,
+    .article-nav__title {
+      transition: none;
+    }
+
+    .article-nav__link:hover .article-nav__arrow {
+      transform: none;
+    }
+  }
+</style>

@@ -1,0 +1,93 @@
+---
+/**
+ * 月份合集页 (/archive/[year]/[month]/)
+ *
+ * 展示指定年份+月份的全部已发布文章，按发布时间倒序。
+ * 复用 ArticleList 组件。
+ */
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import Container from '@/components/Container.astro';
+import ArticleList from '@/components/ArticleList.astro';
+import '@/styles/page.css';
+import { getArchiveTree, getArticlesByYearMonth } from '@/utils/articles';
+import { withBase } from '@/utils/site';
+
+const monthNames: Record<string, string> = {
+  '01': '1月', '02': '2月', '03': '3月', '04': '4月',
+  '05': '5月', '06': '6月', '07': '7月', '08': '8月',
+  '09': '9月', '10': '10月', '11': '11月', '12': '12月',
+};
+
+export async function getStaticPaths() {
+  const tree = await getArchiveTree();
+  const paths: Array<{
+    params: { year: string; month: string };
+    props: { year: string; month: string };
+  }> = [];
+  for (const yearNode of tree) {
+    for (const monthNode of yearNode.months) {
+      paths.push({
+        params: { year: yearNode.year, month: monthNode.month },
+        props: { year: yearNode.year, month: monthNode.month },
+      });
+    }
+  }
+  return paths;
+}
+
+interface Props {
+  year: string;
+  month: string;
+}
+
+const { year, month } = Astro.props;
+const articles = await getArticlesByYearMonth(year, month);
+const monthLabel = monthNames[month] ?? `${month}月`;
+---
+
+<BaseLayout title={`${year}年${monthLabel}归档`}>
+  <Container>
+    <section class="page-header">
+      <nav class="breadcrumb" aria-label="面包屑">
+        <a href={withBase('/archive/')}>时间树</a>
+        <span aria-hidden="true">/</span>
+        <a href={withBase(`/archive/${year}/`)}>{year} 年</a>
+        <span aria-hidden="true">/</span>
+        <span class="breadcrumb__current">{monthLabel}</span>
+      </nav>
+      <h1 class="page-header__title">{year} 年 {monthLabel}</h1>
+      <p class="page-header__subtitle">
+        共 {articles.length} 篇文章，按发布时间倒序排列。
+      </p>
+    </section>
+
+    <section class="stack" aria-label={`${year}年${monthLabel}文章`}>
+      <ArticleList articles={articles} showTags={true} emptyText="该月份暂无文章" />
+    </section>
+  </Container>
+</BaseLayout>
+
+<style>
+  .breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    font-size: var(--fs-sm);
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-sm);
+  }
+
+  .breadcrumb a {
+    color: var(--color-brand);
+    text-decoration: none;
+  }
+
+  .breadcrumb a:hover {
+    color: var(--color-brand-strong);
+  }
+
+  .breadcrumb__current {
+    color: var(--color-heading);
+    font-weight: var(--fw-medium);
+  }
+</style>

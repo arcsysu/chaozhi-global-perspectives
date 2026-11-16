@@ -1,0 +1,77 @@
+---
+/**
+ * 主题合集页 (/topics/[tag]/)
+ *
+ * 展示指定标签下的全部已发布文章，按发布时间倒序。
+ * 复用 ArticleList 组件。
+ *
+ * 路由参数 tag 为 URL 编码的主题名称。
+ * 通过 getStaticPaths 预生成所有标签对应的静态页面。
+ */
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import Container from '@/components/Container.astro';
+import ArticleList from '@/components/ArticleList.astro';
+import '@/styles/page.css';
+import { getTagStats, getArticlesByTag } from '@/utils/articles';
+import { withBase } from '@/utils/site';
+
+export async function getStaticPaths() {
+  const tagStats = await getTagStats();
+  return tagStats.map(({ tag }) => ({
+    params: { tag: encodeURIComponent(tag) },
+    props: { tag },
+  }));
+}
+
+interface Props {
+  tag: string;
+}
+
+const { tag } = Astro.props;
+const articles = await getArticlesByTag(tag);
+---
+
+<BaseLayout title={`主题：${tag}`}>
+  <Container>
+    <section class="page-header">
+      <nav class="breadcrumb" aria-label="面包屑">
+        <a href={withBase('/topics/')}>主题</a>
+        <span aria-hidden="true">/</span>
+        <span class="breadcrumb__current">{tag}</span>
+      </nav>
+      <h1 class="page-header__title">{tag}</h1>
+      <p class="page-header__subtitle">
+        共 {articles.length} 篇文章，按发布时间倒序排列。
+      </p>
+    </section>
+
+    <section class="stack" aria-label={`${tag} 主题文章`}>
+      <ArticleList articles={articles} showTags={false} emptyText="该主题暂无文章" />
+    </section>
+  </Container>
+</BaseLayout>
+
+<style>
+  .breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    font-size: var(--fs-sm);
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-sm);
+  }
+
+  .breadcrumb a {
+    color: var(--color-brand);
+    text-decoration: none;
+  }
+
+  .breadcrumb a:hover {
+    color: var(--color-brand-strong);
+  }
+
+  .breadcrumb__current {
+    color: var(--color-heading);
+    font-weight: var(--fw-medium);
+  }
+</style>

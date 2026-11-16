@@ -1,0 +1,156 @@
+---
+/**
+ * 文章自动章节目录 (ArticleTOC)
+ *
+ * 从 render() 返回的 headings 数据自动生成目录。
+ * 仅显示 h2、h3（depth 2、3），不强制短文章显示。
+ *
+ * 功能：
+ * - 点击跳转对应章节（利用 Astro 自动生成的 heading id 锚点）。
+ * - 滚动时高亮当前章节（IntersectionObserver）。
+ * - 锚点跳转时偏移，避免被固定阅读栏遮挡（CSS scroll-margin-top）。
+ *
+ * 数据来源：render(entry).headings，结构为 { depth, slug, text }[]。
+ */
+export interface Heading {
+  depth: number;
+  slug: string;
+  text: string;
+}
+
+interface Props {
+  headings: Heading[];
+}
+
+const { headings } = Astro.props;
+
+// 仅保留 h2(depth=2) 和 h3(depth=3)
+const tocHeadings = headings.filter((h) => h.depth === 2 || h.depth === 3);
+---
+
+{
+  tocHeadings.length >= 3 && (
+    <nav class="article-toc" aria-label="章节目录">
+      <h2 class="article-toc__title">目录</h2>
+      <ul class="article-toc__list" id="article-toc-list">
+        {tocHeadings.map((h) => (
+          <li
+            class:list={['article-toc__item', { 'article-toc__item--h3': h.depth === 3 }]}
+          >
+            <a
+              href={`#${h.slug}`}
+              class="article-toc__link"
+              data-toc-slug={h.slug}
+            >
+              {h.text}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  )
+}
+
+<script>
+  // 滚动高亮当前章节（IntersectionObserver，无依赖）
+  const tocLinks = document.querySelectorAll<HTMLAnchorElement>('.article-toc__link');
+  if (tocLinks.length > 0) {
+    const headingMap = new Map<string, HTMLAnchorElement>();
+    tocLinks.forEach((link) => {
+      const slug = link.dataset.tocSlug;
+      if (slug) headingMap.set(slug, link);
+    });
+
+    // 观察所有正文标题元素
+    const headingsToObserve = Array.from(headingMap.keys())
+      .map((slug) => document.getElementById(slug))
+      .filter((el): el is HTMLElement => el !== null);
+
+    if (headingsToObserve.length > 0) {
+      let activeLink: HTMLAnchorElement | null = null;
+
+      const observer = new IntersectionObserver(
+        (entries) => {
+          // 找到最靠近视口顶部的可见标题
+          let topMost: { el: HTMLElement; top: number } | null = null;
+          for (const entry of entries) {
+            if (entry.isIntersecting) {
+              const top = entry.boundingClientRect.top;
+              if (!topMost || top < topMost.top) {
+                topMost = { el: entry.target as HTMLElement, top };
+              }
+            }
+          }
+          if (topMost) {
+            const slug = topMost.el.id;
+            const link = headingMap.get(slug);
+            if (link && link !== activeLink) {
+              activeLink?.classList.remove('is-active');
+              link.classList.add('is-active');
+              activeLink = link;
+            }
+          }
+        },
+        {
+          // 根区域偏移：考虑固定阅读栏高度（约 80px）
+          rootMargin: '-100px 0px -70% 0px',
+          threshold: 0,
+        },
+      );
+
+      headingsToObserve.forEach((el) => observer.observe(el));
+    }
+  }
+</script>
+
+<style>
+  .article-toc {
+    padding-top: var(--space-md);
+  }
+
+  .article-toc__title {
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-semibold);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: var(--space-sm);
+  }
+
+  .article-toc__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border-left: 2px solid var(--color-border);
+  }
+
+  .article-toc__item {
+    margin: 0;
+  }
+
+  .article-toc__item--h3 {
+    padding-left: var(--space-md);
+  }
+
+  .article-toc__link {
+    display: block;
+    padding: var(--space-2xs) var(--space-sm);
+    font-size: var(--fs-xs);
+    line-height: var(--lh-normal);
+    color: var(--color-text-muted);
+    text-decoration: none;
+    border-left: 2px solid transparent;
+    margin-left: -2px;
+    transition: color var(--transition-fast);
+  }
+
+  .article-toc__link:hover {
+    color: var(--color-brand);
+  }
+
+  .article-toc__link.is-active {
+    color: var(--color-brand);
+    font-weight: var(--fw-medium);
+    border-left-color: var(--color-brand);
+  }
+</style>

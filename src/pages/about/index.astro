@@ -1,0 +1,83 @@
+---
+/**
+ * 关于我们页 (/about/)
+ *
+ * 展示项目定位、YatCC 品牌与微信公众号信息。
+ * 仅呈现已确定的品牌信息，不编造统计数据。
+ */
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import Container from '@/components/Container.astro';
+import Logo from '@/components/Logo.astro';
+import '@/styles/page.css';
+import { site } from '@/utils/site';
+---
+
+<BaseLayout title="关于我们">
+  <Container>
+    <section class="page-header">
+      <h1 class="page-header__title">关于我们</h1>
+      <p class="page-header__subtitle">
+        了解 {site.name} 的项目定位、团队与发布渠道。
+      </p>
+    </section>
+
+    <section class="stack about">
+      <!-- 项目定位 -->
+      <div class="placeholder-card">
+        <h2 class="placeholder-card__title">项目定位</h2>
+        <p class="placeholder-card__body">
+          {site.name} 是 {site.team} 团队围绕 <strong>{site.direction}</strong>
+          前沿观察计划建设的科技信息展示平台，同时配套运营同名微信公众号。网站以内容优先的静态博客形式，持续追踪并呈现 HPC 与 AI for Science 领域的全球动态。
+        </p>
+        <p class="placeholder-card__body">
+          <strong>核心原则：</strong>由 AI Agent 定期收集领域信息并生成文章，经过格式校验与必要的人工审核后，网站自动读取 Markdown 文章并完成分类、排版与展示。同一批文章亦用于微信公众号发布。
+        </p>
+      </div>
+
+      <!-- YatCC 品牌 -->
+      <div class="placeholder-card">
+        <h2 class="placeholder-card__title">YatCC 品牌</h2>
+        <div class="about__brand">
+          <Logo size={48} />
+          <div class="about__brand-text">
+            <p class="placeholder-card__body">
+              本网站属于 <strong>{site.team}</strong> 团队。YatCC
+              原始 Logo（紫色龙形图案及字标）目前仍在准备中，当前导航栏使用简洁的「Y」字母图标作为占位，正式 Logo 资源就绪后将直接替换。
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 发布渠道 -->
+      <div class="placeholder-card">
+        <h2 class="placeholder-card__title">发布渠道</h2>
+        <p class="placeholder-card__body">
+          本网站与微信公众号「<strong>{site.wechatAccount}</strong>」同步发布观察成果。文章由同一套 Markdown 内容驱动，确保跨渠道内容一致。
+        </p>
+        <p class="placeholder-card__note">
+          网站当前处于开发阶段，正式内容发布将在后续阶段启动。
+        </p>
+      </div>
+    </section>
+  </Container>
+</BaseLayout>
+
+<style>
+  .about__brand {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-md);
+    margin-top: var(--space-md);
+  }
+
+  .about__brand-text {
+    flex: 1;
+  }
+
+  @media (max-width: 768px) {
+    .about__brand {
+      flex-direction: column;
+      gap: var(--space-sm);
+    }
+  }
+</style>

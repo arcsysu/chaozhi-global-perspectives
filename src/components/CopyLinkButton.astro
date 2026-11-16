@@ -1,0 +1,130 @@
+---
+/**
+ * 复制文章链接按钮 (CopyLinkButton)
+ *
+ * 点击复制当前文章 URL 到剪贴板。
+ * 成功后简短反馈，失败时提供备用提示。
+ * 正确处理 GitHub Pages 子路径（使用 window.location.href）。
+ *
+ * 无第三方分享 API，移动端可访问。
+ */
+---
+
+<div class="copy-link">
+  <button
+    type="button"
+    class="copy-link__btn"
+    id="copy-link-btn"
+    aria-label="分享本文"
+    title="分享本文"
+  >
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+    </svg>
+    <span class="copy-link__label">分享本文</span>
+  </button>
+  <span class="copy-link__feedback" id="copy-link-feedback" role="status" aria-live="polite"></span>
+</div>
+
+<script>
+  const btn = document.getElementById('copy-link-btn');
+  const feedback = document.getElementById('copy-link-feedback');
+
+  if (btn) {
+    btn.addEventListener('click', async () => {
+      const url = window.location.href;
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(url);
+        } else {
+          // 回退方案：传统 execCommand
+          const textarea = document.createElement('textarea');
+          textarea.value = url;
+          textarea.style.position = 'fixed';
+          textarea.style.opacity = '0';
+          document.body.appendChild(textarea);
+          textarea.select();
+          document.execCommand('copy');
+          document.body.removeChild(textarea);
+        }
+        if (feedback) {
+          feedback.textContent = '链接已复制';
+          feedback.classList.add('is-visible');
+          setTimeout(() => {
+            feedback.classList.remove('is-visible');
+          }, 2000);
+        }
+      } catch {
+        if (feedback) {
+          feedback.textContent = '复制失败，请手动复制地址栏链接';
+          feedback.classList.add('is-visible', 'is-error');
+          setTimeout(() => {
+            feedback.classList.remove('is-visible', 'is-error');
+          }, 3000);
+        }
+      }
+    });
+  }
+</script>
+
+<style>
+  .copy-link {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+  }
+
+  .copy-link__btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: var(--space-xs) var(--space-sm);
+    font-size: var(--fs-xs);
+    color: var(--color-text-muted);
+    background-color: var(--color-surface-alt);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition:
+      color var(--transition-fast),
+      background-color var(--transition-fast);
+  }
+
+  .copy-link__btn:hover {
+    color: var(--color-brand);
+    background-color: var(--color-brand-soft);
+    border-color: var(--color-brand-border);
+  }
+
+  .copy-link__label {
+    font-weight: var(--fw-medium);
+  }
+
+  .copy-link__feedback {
+    font-size: var(--fs-xs);
+    color: var(--color-brand-strong);
+    opacity: 0;
+    transition: opacity var(--transition-fast);
+    pointer-events: none;
+  }
+
+  .copy-link__feedback.is-visible {
+    opacity: 1;
+  }
+
+  .copy-link__feedback.is-error {
+    color: #dc2626;
+  }
+</style>

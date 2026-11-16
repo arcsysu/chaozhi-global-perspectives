@@ -1,0 +1,487 @@
+---
+/**
+ * 标题搜索面板 (SearchPanel)
+ *
+ * 功能：
+ * - 点击搜索图标 → 展开搜索框（覆盖层下拉）。
+ * - 标题搜索（不含正文），支持中英文，英文大小写不敏感。
+ * - 实时输入实时搜索（防抖 150ms）。
+ * - 结果展示标题、摘要、日期、可选缩略图。
+ * - 无结果显示空状态。
+ * - ESC 关闭，关闭后焦点回到触发按钮。
+ * - 移动端友好：全宽下拉，触摸友好的结果项。
+ *
+ * 数据来源：构建时生成的静态 JSON (/search-index.json)，原生 JS fetch 加载。
+ * 无数据库、无搜索服务端、无第三方库。
+ *
+ * 内容隔离：
+ * - Demo 文章在开发环境以 [Demo] 前缀出现在索引中，链接前缀 /demo/。
+ * - 生产构建索引不含 Demo。
+ */
+---
+
+<!-- 搜索面板（默认隐藏，JS 控制展开） -->
+<div
+  class="search-panel"
+  id="search-panel"
+  role="dialog"
+  aria-modal="false"
+  aria-label="标题搜索"
+  hidden
+>
+  <div class="search-panel__inner">
+    <div class="search-panel__input-row">
+      <svg
+        class="search-panel__icon"
+        xmlns="http://www.w3.org/2000/svg"
+        width="20"
+        height="20"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <circle cx="11" cy="11" r="7"></circle>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      </svg>
+      <input
+        type="search"
+        class="search-panel__input"
+        id="search-input"
+        placeholder="搜索文章标题…"
+        autocomplete="off"
+        aria-label="搜索关键词"
+        aria-controls="search-results"
+      />
+      <button
+        type="button"
+        class="search-panel__close"
+        id="search-close"
+        aria-label="关闭搜索"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+
+    <div
+      class="search-panel__results"
+      id="search-results"
+      role="listbox"
+      aria-label="搜索结果"
+    >
+      <!-- 初始提示（未输入时） -->
+      <p class="search-panel__hint" id="search-hint">
+        输入关键词搜索文章标题，支持中英文。
+      </p>
+      <!-- 结果列表由 JS 动态渲染 -->
+    </div>
+  </div>
+</div>
+
+<script>
+  // ──────────────────────────────────────────────
+  // 搜索面板交互（原生 JS，无依赖）
+  // ──────────────────────────────────────────────
+
+  interface SearchEntry {
+    id: string;
+    title: string;
+    summary: string;
+    publishedAt: string;
+    coverImage: string | null;
+  }
+
+  const panel = document.getElementById('search-panel');
+  const input = document.getElementById('search-input') as HTMLInputElement | null;
+  const resultsContainer = document.getElementById('search-results');
+  const hint = document.getElementById('search-hint');
+  const closeBtn = document.getElementById('search-close');
+  const trigger = document.getElementById('search-trigger');
+
+  // BASE_URL 兼容（从 data 属性读取，由 Header 注入）
+  const baseUrl = trigger?.dataset.base || '/';
+
+  let searchIndex: SearchEntry[] | null = null;
+  let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  let lastTrigger: HTMLElement | null = null;
+
+  /** 懒加载搜索索引（首次打开时 fetch） */
+  async function loadIndex(): Promise<SearchEntry[]> {
+    if (searchIndex) return searchIndex;
+    try {
+      const res = await fetch(`${baseUrl}search-index.json`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      searchIndex = (await res.json()) as SearchEntry[];
+    } catch {
+      searchIndex = [];
+    }
+    return searchIndex;
+  }
+
+  /** 格式化日期为中文显示 */
+  function formatDate(iso: string): string {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+  }
+
+  /**
+   * 标题搜索（大小写不敏感）。
+   * 支持中英文混合，用 toLowerCase() 统一比较。
+   * 返回最多 20 条结果。
+   */
+  function search(query: string, index: SearchEntry[]): SearchEntry[] {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    return index
+      .filter((e) => e.title.toLowerCase().includes(q))
+      .slice(0, 20);
+  }
+
+  /** 渲染搜索结果 */
+  function renderResults(query: string, results: SearchEntry[]): void {
+    if (!resultsContainer || !hint) return;
+
+    if (!query.trim()) {
+      hint.style.display = '';
+      resultsContainer.innerHTML = '';
+      // 重新插入提示（innerHTML 清空了）
+      resultsContainer.appendChild(hint);
+      return;
+    }
+
+    hint.style.display = 'none';
+
+    if (results.length === 0) {
+      resultsContainer.innerHTML = `<p class="search-panel__empty">未找到与「${escapeHtml(query)}」相关的文章。</p>`;
+      return;
+    }
+
+    const html = results
+      .map((e) => {
+        const isDemo = e.title.startsWith('[Demo]');
+        const titleDisplay = isDemo ? e.title : e.title;
+        const linkPrefix = isDemo ? `${baseUrl}demo/` : `${baseUrl}articles/`;
+        const href = `${linkPrefix}${encodeURIComponent(e.id)}/`;
+        const thumb = e.coverImage
+          ? `<img src="${e.coverImage}" alt="" class="search-result__thumb" loading="lazy" />`
+          : '';
+        const demoBadge = isDemo
+          ? '<span class="search-result__demo">Demo</span>'
+          : '';
+
+        return `
+          <a href="${href}" class="search-result" role="option">
+            ${thumb}
+            <div class="search-result__body">
+              <div class="search-result__title-row">
+                ${demoBadge}
+                <span class="search-result__title">${escapeHtml(titleDisplay)}</span>
+              </div>
+              <p class="search-result__summary">${escapeHtml(e.summary)}</p>
+              <time class="search-result__date">${formatDate(e.publishedAt)}</time>
+            </div>
+          </a>
+        `;
+      })
+      .join('');
+
+    resultsContainer.innerHTML = html;
+  }
+
+  /** HTML 转义防注入 */
+  function escapeHtml(str: string): string {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  /** 打开搜索面板 */
+  async function openPanel(): Promise<void> {
+    if (!panel || !input) return;
+    lastTrigger = document.activeElement as HTMLElement;
+    panel.hidden = false;
+    requestAnimationFrame(() => {
+      panel.classList.add('is-open');
+      input.focus();
+    });
+    // 懒加载索引
+    if (!searchIndex) {
+      await loadIndex();
+    }
+  }
+
+  /** 关闭搜索面板 */
+  function closePanel(): void {
+    if (!panel || !input) return;
+    panel.classList.remove('is-open');
+    panel.hidden = true;
+    input.value = '';
+    if (resultsContainer) resultsContainer.innerHTML = '';
+    if (hint) {
+      hint.style.display = '';
+      resultsContainer?.appendChild(hint);
+    }
+    // 焦点回到触发按钮
+    lastTrigger?.focus();
+    lastTrigger = null;
+  }
+
+  // ── 事件绑定 ──
+
+  // 触发按钮点击 → 打开
+  trigger?.addEventListener('click', openPanel);
+
+  // 关闭按钮
+  closeBtn?.addEventListener('click', closePanel);
+
+  // 输入防抖搜索
+  input?.addEventListener('input', () => {
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(async () => {
+      const query = input.value;
+      const index = searchIndex ?? (await loadIndex());
+      const results = search(query, index);
+      renderResults(query, results);
+    }, 150);
+  });
+
+  // ESC 关闭
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && panel && !panel.hidden) {
+      closePanel();
+    }
+  });
+
+  // 点击面板外部关闭
+  document.addEventListener('click', (e) => {
+    if (!panel || panel.hidden) return;
+    const target = e.target as Node;
+    if (!panel.contains(target) && !trigger?.contains(target)) {
+      closePanel();
+    }
+  });
+
+  // 结果链接点击后关闭面板
+  resultsContainer?.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('a')) {
+      // 延迟关闭，让导航先发生
+      setTimeout(closePanel, 100);
+    }
+  });
+</script>
+
+<style>
+  .search-panel {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: var(--z-header, 100);
+    background-color: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+    box-shadow: var(--shadow-header-float, 0 4px 12px rgba(0, 0, 0, 0.08));
+    opacity: 0;
+    transform: translateY(-8px);
+    transition:
+      opacity var(--transition-fast, 0.15s),
+      transform var(--transition-fast, 0.15s);
+    pointer-events: none;
+  }
+
+  .search-panel[hidden] {
+    display: none;
+  }
+
+  .search-panel.is-open {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+
+  .search-panel__inner {
+    max-width: var(--width-content, 760px);
+    margin-inline: auto;
+    padding: var(--space-md, 16px) var(--space-lg, 24px) var(--space-lg, 24px);
+  }
+
+  .search-panel__input-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm, 8px);
+    border: 1px solid var(--color-border, #e5e7eb);
+    border-radius: var(--radius-md, 8px);
+    padding: var(--space-sm, 8px) var(--space-md, 12px);
+    background-color: var(--color-surface-alt, #fafafa);
+  }
+
+  .search-panel__input-row:focus-within {
+    border-color: var(--color-brand, #6d4aff);
+    box-shadow: 0 0 0 2px var(--color-brand-soft, #ede9fe);
+  }
+
+  .search-panel__icon {
+    color: var(--color-text-muted, #6b7280);
+    flex-shrink: 0;
+  }
+
+  .search-panel__input {
+    flex: 1;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-size: var(--fs-base, 16px);
+    color: var(--color-text, #1f2937);
+    padding: var(--space-xs, 4px) 0;
+  }
+
+  .search-panel__input::placeholder {
+    color: var(--color-text-muted, #9ca3af);
+  }
+
+  .search-panel__close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-sm, 4px);
+    color: var(--color-text-muted, #6b7280);
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .search-panel__close:hover {
+    color: var(--color-heading, #111827);
+    background-color: var(--color-border, #f3f4f6);
+  }
+
+  .search-panel__results {
+    margin-top: var(--space-md, 16px);
+    max-height: 60vh;
+    overflow-y: auto;
+  }
+
+  .search-panel__hint {
+    text-align: center;
+    color: var(--color-text-muted, #9ca3af);
+    font-size: var(--fs-sm, 14px);
+    padding: var(--space-xl, 32px) 0;
+  }
+
+  .search-panel__empty {
+    text-align: center;
+    color: var(--color-text-muted, #6b7280);
+    font-size: var(--fs-sm, 14px);
+    padding: var(--space-xl, 32px) 0;
+  }
+
+  /* 搜索结果项 */
+  .search-result {
+    display: flex;
+    gap: var(--space-md, 12px);
+    padding: var(--space-sm, 8px) var(--space-md, 12px);
+    border-radius: var(--radius-md, 8px);
+    text-decoration: none;
+    color: var(--color-text, #1f2937);
+    transition: background-color var(--transition-fast, 0.15s);
+  }
+
+  .search-result:hover {
+    background-color: var(--color-brand-soft, #f5f3ff);
+  }
+
+  .search-result__thumb {
+    width: 64px;
+    height: 48px;
+    object-fit: cover;
+    border-radius: var(--radius-sm, 4px);
+    flex-shrink: 0;
+  }
+
+  .search-result__body {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .search-result__title-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs, 4px);
+  }
+
+  .search-result__demo {
+    font-size: var(--fs-xs, 12px);
+    padding: 1px 6px;
+    background-color: #fef3c7;
+    color: #92400e;
+    border-radius: var(--radius-sm, 4px);
+    font-weight: var(--fw-medium, 500);
+    flex-shrink: 0;
+  }
+
+  .search-result__title {
+    font-size: var(--fs-sm, 14px);
+    font-weight: var(--fw-semibold, 600);
+    color: var(--color-heading, #111827);
+    line-height: var(--lh-tight, 1.3);
+    /* 标题过长截断 */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .search-result__summary {
+    margin-top: 2px;
+    font-size: var(--fs-xs, 12px);
+    color: var(--color-text-muted, #6b7280);
+    line-height: var(--lh-normal, 1.5);
+    /* 限制两行 */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .search-result__date {
+    display: block;
+    margin-top: 2px;
+    font-size: var(--fs-xs, 12px);
+    color: var(--color-text-muted, #9ca3af);
+  }
+
+  /* 移动端：全宽，触摸友好 */
+  @media (max-width: 768px) {
+    .search-panel__inner {
+      padding: var(--space-sm, 8px) var(--space-md, 12px) var(--space-md, 12px);
+    }
+
+    .search-result__thumb {
+      width: 56px;
+      height: 42px;
+    }
+
+    .search-result {
+      padding: var(--space-md, 12px);
+    }
+  }
+</style>

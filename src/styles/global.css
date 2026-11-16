@@ -1,0 +1,275 @@
+/**
+ * 超智全球视野 — 全局样式与设计令牌 (global.css)
+ *
+ * 视觉参考：Quanta Magazine（现代学术期刊式）
+ * 设计原则：专业、简洁、克制，淡紫 + 白为主，留白充足。
+ *
+ * 本文件集中维护品牌配色、字体、间距、断点等设计变量，
+ * 后续调整品牌资源、配色或排版仅需修改此处，无需改动组件。
+ */
+
+:root {
+  /* ============================================================
+   * 1. 品牌配色 — 延续 YatCC 紫色体系
+   * ============================================================ */
+
+  /* 主品牌紫：用于 Logo、链接、按钮、选中态等重点元素 */
+  --color-brand: #6d4aff;
+  --color-brand-rgb: 109, 74, 255;
+
+  /* 辅助紫色梯度：hover / 强调 / 边框等 */
+  --color-brand-strong: #5a36f0; /* hover / 按下 */
+  --color-brand-soft: #efeaff; /* 极浅紫：标签底、选中底 */
+  --color-brand-border: #d9ccff; /* 紫色描边 */
+
+  /* 淡紫点缀（用于分隔、装饰，克制使用） */
+  --color-accent-lilac: #b8a4ff;
+
+  /* ============================================================
+   * 2. 页面与表面色
+   * ============================================================ */
+
+  /* 页面背景：极浅淡紫白（主基调） */
+  --color-bg: #f7f6fc;
+  /* 导航 / 卡片背景：纯白 */
+  --color-surface: #ffffff;
+  /* 次级表面：略带紫调的浅灰，用于页脚、次要区块 */
+  --color-surface-alt: #f1eff8;
+  /* 分隔线 / 边框 */
+  --color-border: #e7e4f2;
+  --color-border-strong: #d3cee8;
+
+  /* ============================================================
+   * 3. 文字颜色
+   * ============================================================ */
+
+  /* 标题：深灰紫 */
+  --color-heading: #2b2640;
+  /* 正文：柔和深灰 */
+  --color-text: #3d3a4e;
+  /* 次要文字：摘要、元信息、占位说明 */
+  --color-text-muted: #767289;
+  /* 反白文字（紫色/深色背景上） */
+  --color-text-invert: #ffffff;
+
+  /* ============================================================
+   * 4. 链接与交互状态
+   * ============================================================ */
+
+  --color-link: var(--color-brand);
+  --color-link-hover: var(--color-brand-strong);
+  --color-link-visited: #7a3fd6;
+
+  /* 焦点环颜色（无障碍） */
+  --color-focus: var(--color-brand);
+
+  /* 选中态：导航当前栏目下划线 */
+  --color-nav-active: var(--color-brand);
+
+  /* ============================================================
+   * 5. 字体系统
+   *    优先系统字体，保证中文显示与加载性能，无网络字体依赖。
+   * ============================================================ */
+
+  /* 西文字体栈：现代无衬线，科研平台气质 */
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue',
+    Arial, 'Noto Sans', sans-serif;
+  /* 中文优先：苹方 / 微软雅黑 / 思源黑体，回退系统默认 */
+  --font-zh:
+    'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB', 'Source Han Sans SC',
+    'Noto Sans CJK SC', sans-serif;
+  /* 衬线（文章正文使用，提升学术书刊气质）
+   * 中文优先思源宋体/Noto Serif SC，英文优先 Georgia。
+   * 回退系统宋体（SimSun/宋体），确保 Windows 和移动端不因字体缺失产生排版问题。
+   */
+  --font-serif:
+    'Source Han Serif SC', 'Noto Serif CJK SC', 'Noto Serif SC', Georgia,
+    'Songti SC', 'SimSun', 'STSong', 'Times New Roman', serif;
+
+  /* 统一应用：中文优先回退西文 */
+  --font-body: var(--font-zh), var(--font-sans);
+  --font-display: var(--font-zh), var(--font-sans);
+
+  /* ============================================================
+   * 6. 字号层级（rem 基准，响应式可微调）
+   * ============================================================ */
+
+  --fs-root: 16px; /* html 基准 */
+  --fs-xs: 0.75rem; /* 12px — 元信息、标签 */
+  --fs-sm: 0.875rem; /* 14px — 辅助文字 */
+  --fs-base: 1rem; /* 16px — 正文 */
+  --fs-md: 1.125rem; /* 18px — 引导段 */
+  --fs-lg: 1.375rem; /* 22px — 区块小标题 */
+  --fs-xl: 1.75rem; /* 28px — 页面标题 */
+  --fs-2xl: 2.25rem; /* 36px — 首页主标题 */
+  --fs-3xl: 2.75rem; /* 44px — 品牌大标题（预留） */
+
+  /* 行高 */
+  --lh-tight: 1.2;
+  --lh-snug: 1.35;
+  --lh-normal: 1.6;
+  --lh-loose: 1.8;
+
+  /* 字重 */
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+
+  /* ============================================================
+   * 7. 间距系统（8px 基准网格）
+   * ============================================================ */
+
+  --space-2xs: 0.25rem; /* 4px */
+  --space-xs: 0.5rem; /* 8px */
+  --space-sm: 0.75rem; /* 12px */
+  --space-md: 1rem; /* 16px */
+  --space-lg: 1.5rem; /* 24px */
+  --space-xl: 2rem; /* 32px */
+  --space-2xl: 3rem; /* 48px */
+  --space-3xl: 4rem; /* 64px */
+  --space-4xl: 6rem; /* 96px — 页面大留白 */
+
+  /* ============================================================
+   * 8. 布局尺寸
+   * ============================================================ */
+
+  /* 页面最大宽度：内容区（参考学术期刊，适中） */
+  --width-content: 72rem; /* 1152px */
+  /* 文章阅读区宽度（预留，三栏布局使用） */
+  --width-article: 48rem; /* 768px */
+  /* 导航栏高度 */
+  --height-header: 4rem; /* 64px 桌面 */
+  --height-header-mobile: 3.5rem; /* 56px 移动 */
+
+  /* ============================================================
+   * 9. 圆角与阴影（克制使用）
+   * ============================================================ */
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-pill: 999px;
+
+  /* 导航栏：非常轻微的阴影 / 分隔线 */
+  --shadow-header: 0 1px 0 var(--color-border);
+  --shadow-header-float: 0 2px 12px rgba(43, 38, 64, 0.06);
+  /* 卡片阴影（预留） */
+  --shadow-card: 0 1px 3px rgba(43, 38, 64, 0.05);
+
+  /* ============================================================
+   * 10. 响应式断点
+   * ============================================================ */
+
+  --bp-sm: 640px; /* 小屏手机横屏 */
+  --bp-md: 768px; /* 平板 */
+  --bp-lg: 1024px; /* 桌面 */
+  --bp-xl: 1280px; /* 大屏桌面 */
+
+  /* ============================================================
+   * 11. 过渡与动效（克制，仅交互反馈）
+   * ============================================================ */
+
+  --transition-fast: 150ms ease;
+  --transition-base: 250ms ease;
+
+  /* z-index 层级 */
+  --z-header: 100;
+  --z-overlay: 200;
+}
+
+/* ============================================================
+ * 基础排版应用
+ * ============================================================ */
+
+html {
+  font-size: var(--fs-root);
+}
+
+body {
+  font-family: var(--font-body);
+  font-size: var(--fs-base);
+  line-height: var(--lh-normal);
+  color: var(--color-text);
+  background-color: var(--color-bg);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-display);
+  color: var(--color-heading);
+  line-height: var(--lh-snug);
+  font-weight: var(--fw-semibold);
+}
+
+h1 {
+  font-size: var(--fs-xl);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-tight);
+}
+
+h2 {
+  font-size: var(--fs-lg);
+}
+
+h3 {
+  font-size: var(--fs-md);
+}
+
+p {
+  line-height: var(--lh-normal);
+}
+
+a {
+  color: var(--color-link);
+  transition: color var(--transition-fast);
+}
+
+a:hover {
+  color: var(--color-link-hover);
+}
+
+a:visited {
+  color: var(--color-link-visited);
+}
+
+strong,
+b {
+  font-weight: var(--fw-semibold);
+}
+
+/* 通用工具类（最小集合，避免过度抽象） */
+.container {
+  width: 100%;
+  max-width: var(--width-content);
+  margin-inline: auto;
+  padding-inline: var(--space-lg);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* 响应式：小屏缩减水平内边距 */
+@media (max-width: 768px) {
+  :root {
+    --fs-2xl: 1.75rem;
+    --fs-xl: 1.5rem;
+  }
+  .container {
+    padding-inline: var(--space-md);
+  }
+}
