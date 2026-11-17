@@ -43,7 +43,7 @@ function isActive(item: (typeof navItems)[number]): boolean {
   <div class="container header__inner">
     <!-- 左：品牌区（Logo + 名称 + 简介） -->
     <a href={withBase('/')} class="header__brand" aria-label={`${site.team} ${site.name} 首页`}>
-      <Logo size={42} />
+      <Logo size={48} />
       <span class="header__brand-text">
         <span class="header__site-name">{site.name}</span>
         <span class="header__brief">{site.brief}</span>
@@ -450,13 +450,13 @@ function isActive(item: (typeof navItems)[number]): boolean {
 
   .header__site-name {
     font-family: var(--font-display);
-    font-size: var(--fs-md);
+    font-size: 25px;
     font-weight: var(--fw-semibold);
     color: var(--color-heading);
   }
 
   .header__brief {
-    font-size: var(--fs-xs);
+    font-size: 13px;
     color: var(--color-text-muted);
     white-space: nowrap;
   }
@@ -477,7 +477,7 @@ function isActive(item: (typeof navItems)[number]): boolean {
     display: inline-block;
     padding-block: var(--space-sm);
     color: var(--color-text);
-    font-size: var(--fs-base);
+    font-size: 18px;
     font-weight: var(--fw-medium);
     transition: color var(--transition-fast);
   }
@@ -514,8 +514,8 @@ function isActive(item: (typeof navItems)[number]): boolean {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 44px;
-    height: 44px;
+    width: 60px;
+    height: 60px;
     border-radius: var(--radius-md);
     color: var(--color-text-muted);
     transition:
