@@ -3,16 +3,20 @@
  * 文章详情页布局 (ArticleLayout) — 第四阶段三栏升级
  *
  * 桌面端三栏布局：
- *   左栏：文章元信息（标签、来源时间、发布时间、Agent/整理来源、资料类型）+ 章节目录
- *   中栏：标题、摘要、正文（Markdown 渲染）、上一篇/下一篇
+ *   左栏：章节目录（若有）或自然留白
+ *   中栏：标题、发布时间、摘要、标签、横线、正文（Markdown 渲染）、下一篇导航
  *   右栏：复制链接按钮、引用来源卡片（脚注提取）
+ *
+ * 文章头部元信息顺序（所有断点统一）：
+ *   返回首页 → 标题 → 发布时间 → 摘要 → 标签 → 细横线 → 正文
+ *   不显示资料类型、Agent 生成时间、人工整理时间。
  *
  * 顶部固定阅读栏：标题离开视口后出现，显示精简标题 + 阅读进度条。
  *
  * 响应式：
  *   宽屏桌面（≥1024px）：完整三栏
- *   平板（768–1023px）：双栏（中正文 + 右来源），左栏元信息移入正文头部
- *   手机（<768px）：单栏，元信息在正文开头，来源回退到文末（GFM 默认渲染）
+ *   平板（768–1023px）：双栏（中正文 + 右来源）
+ *   手机（<768px）：单栏，来源回退到文末（GFM 默认渲染）
  *
  * 复用已有组件：ArticleTOC、CopyLinkButton、ReadingProgressBar、ArticleNav、ArticleFootnotes。
  * 不引入 React/Vue/动画库，全部原生 JS + CSS。
@@ -37,7 +41,6 @@ export interface ArticleHeadMeta {
   sourceTimeIso: string;
   publishedAtLabel: string | null;
   publishedAtIso: string | null;
-  sourceTypeLabel?: string;
   isDemo?: boolean;
 }
 
@@ -82,39 +85,43 @@ const isDemo = meta.isDemo ?? false;
 
   {/* 三栏布局容器 */}
   <div class="article-layout">
-    {/* 左栏：元信息 + 目录 */}
-    <aside class="article-layout__left" aria-label="文章信息">
+    {/* 左栏：章节目录（无目录时自然留白，不再重复元信息） */}
+    <aside class="article-layout__left" aria-label="章节目录">
       <div class="article-meta-sidebar">
-        {/* 元信息：发布时间 → 资料类型（精简，不显示 Agent/整理时间） */}
-        <dl class="article-meta-sidebar__list">
-          {
-            meta.publishedAtLabel && (
-              <div class="article-meta-sidebar__item">
-                <dt>发布时间</dt>
-                <dd>
-                  <time datetime={meta.publishedAtIso!}>{meta.publishedAtLabel}</time>
-                </dd>
-              </div>
-            )
-          }
-          {
-            meta.sourceTypeLabel && (
-              <div class="article-meta-sidebar__item">
-                <dt>资料类型</dt>
-                <dd>{meta.sourceTypeLabel}</dd>
-              </div>
-            )
-          }
-        </dl>
+        <ArticleTOC headings={headings} />
+      </div>
+    </aside>
 
-        {/* 标签（放在资料类型下方，可点击跳转主题合集） */}
+    {/* 中栏：标题 → 发布时间 → 摘要 → 标签 → 横线 → 正文 + 导航 */}
+    <main class="article-layout__main">
+      {/* 返回入口 */}
+      <nav class="article-back" aria-label="返回导航">
+        <a href={backHref} class="article-back__link">← {backLabel}</a>
+        {isDemo && <span class="article-back__demo-tag">Demo 预览</span>}
+      </nav>
+
+      {/*
+        文章头部（所有断点统一顺序）：
+        标题 → 发布时间 → 斜体摘要 → 标签 → 细横线（由 article-head 的 border-bottom 承担）
+        不显示资料类型、Agent 生成时间、人工整理时间。
+      */}
+      <header class="article-head">
+        <h1 class="article-head__title">{meta.title}</h1>
+        {
+          meta.publishedAtLabel && (
+            <time class="article-head__published" datetime={meta.publishedAtIso!}>
+              {meta.publishedAtLabel}
+            </time>
+          )
+        }
+        <p class="article-head__summary">{meta.summary}</p>
         {
           meta.tags.length > 0 && (
-            <div class="article-meta-sidebar__tags">
+            <div class="article-head__tags">
               {meta.tags.map((tag) => (
                 <a
                   href={withBase(`/topics/${encodeURIComponent(tag)}/`)}
-                  class="article-meta-sidebar__tag"
+                  class="article-head__tag"
                 >
                   {tag}
                 </a>
@@ -122,63 +129,6 @@ const isDemo = meta.isDemo ?? false;
             </div>
           )
         }
-
-        {/* 章节目录 */}
-        <ArticleTOC headings={headings} />
-      </div>
-    </aside>
-
-    {/* 中栏：标题 + 摘要 + 正文 + 导航 */}
-    <main class="article-layout__main">
-      {/* 面包屑 + 返回入口 */}
-      <nav class="article-back" aria-label="返回导航">
-        <a href={backHref} class="article-back__link">← {backLabel}</a>
-        {isDemo && <span class="article-back__demo-tag">Demo 预览</span>}
-      </nav>
-
-      {/* 文章头部：移动端元信息（桌面端隐藏，由左栏承担） */}
-      <header class="article-head">
-        <h1 class="article-head__title">{meta.title}</h1>
-        <p class="article-head__summary">{meta.summary}</p>
-
-        {/* 移动端/平板元信息（桌面三栏时隐藏）
-         * 精简：仅发布时间 → 资料类型 → 标签 */}
-        <div class="article-head__mobile-meta">
-          <dl class="article-head__meta">
-            {
-              meta.publishedAtLabel && (
-                <div class="article-head__meta-item">
-                  <dt>发布时间</dt>
-                  <dd>
-                    <time datetime={meta.publishedAtIso!}>{meta.publishedAtLabel}</time>
-                  </dd>
-                </div>
-              )
-            }
-            {
-              meta.sourceTypeLabel && (
-                <div class="article-head__meta-item">
-                  <dt>资料类型</dt>
-                  <dd>{meta.sourceTypeLabel}</dd>
-                </div>
-              )
-            }
-          </dl>
-          {
-            meta.tags.length > 0 && (
-              <div class="article-head__tags">
-                {meta.tags.map((tag) => (
-                  <a
-                    href={withBase(`/topics/${encodeURIComponent(tag)}/`)}
-                    class="article-head__tag"
-                  >
-                    {tag}
-                  </a>
-                ))}
-              </div>
-            )
-          }
-        </div>
       </header>
 
       {/* 文章正文（Markdown 渲染） */}
@@ -186,7 +136,7 @@ const isDemo = meta.isDemo ?? false;
         <slot />
       </article>
 
-      {/* 上一篇/下一篇 */}
+      {/* 下一篇导航（ArticleNav 接收 next；单篇降级由工具层处理） */}
       <ArticleNav prev={prev} next={next} linkPrefix={linkPrefix} isDemo={isDemo} />
     </main>
 
@@ -327,7 +277,7 @@ const isDemo = meta.isDemo ?? false;
     font-weight: var(--fw-medium, 500);
   }
 
-  /* 文章头部 */
+  /* 文章头部：标题 → 发布时间 → 摘要 → 标签 → 横线（border-bottom） */
   .article-head {
     padding-bottom: var(--space-xl, 32px);
     border-bottom: 1px solid var(--color-border, #e7e4f2);
@@ -344,8 +294,16 @@ const isDemo = meta.isDemo ?? false;
     text-wrap: balance; /* 平衡多行长度，避免末行只剩两三字 */
   }
 
+  /* 发布时间：标题下方、摘要上方，12px 浅灰紫 */
+  .article-head__published {
+    display: block;
+    margin-top: var(--space-sm, 12px);
+    font-size: var(--fs-xs, 12px);
+    color: var(--color-text-muted, #767289);
+  }
+
   .article-head__summary {
-    margin-top: var(--space-md, 16px);
+    margin-top: var(--space-sm, 12px);
     font-size: 13px; /* 摘要固定 13px */
     font-style: italic; /* 摘要斜体，仅作用于文章详情页摘要 */
     color: var(--color-text-muted, #767289);
@@ -353,81 +311,7 @@ const isDemo = meta.isDemo ?? false;
     font-family: var(--font-serif, Georgia, serif);
   }
 
-  /* 左栏元信息样式 */
-  .article-meta-sidebar__tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-xs, 8px);
-    margin-bottom: var(--space-lg, 24px);
-  }
-
-  .article-meta-sidebar__tag {
-    font-size: var(--fs-xs, 12px);
-    padding: var(--space-2xs, 4px) var(--space-sm, 12px);
-    background-color: var(--color-brand-soft, #efeaff);
-    color: var(--color-brand-strong, #5a36f0);
-    border-radius: var(--radius-pill, 999px);
-    text-decoration: none;
-    border: 1px solid var(--color-brand-border, #d9ccff);
-  }
-
-  .article-meta-sidebar__tag:hover {
-    background-color: var(--color-brand-border, #d9ccff);
-  }
-
-  .article-meta-sidebar__list {
-    margin: 0 0 var(--space-lg, 24px) 0;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-md, 16px);
-  }
-
-  .article-meta-sidebar__item {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2xs, 4px);
-  }
-
-  .article-meta-sidebar__item dt {
-    font-size: var(--fs-xs, 12px);
-    color: var(--color-text-muted, #767289);
-    font-weight: var(--fw-regular, 400);
-  }
-
-  .article-meta-sidebar__item dd {
-    font-size: var(--fs-sm, 14px);
-    color: var(--color-heading, #2b2640);
-    font-weight: var(--fw-medium, 500);
-    margin: 0;
-  }
-
-  /* 移动端/平板元信息样式（复用旧样式） */
-  .article-head__meta {
-    margin-top: var(--space-lg, 24px);
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-md, 16px) var(--space-xl, 32px);
-  }
-
-  .article-head__meta-item {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2xs, 4px);
-  }
-
-  .article-head__meta-item dt {
-    font-size: var(--fs-xs, 12px);
-    color: var(--color-text-muted, #767289);
-    font-weight: var(--fw-regular, 400);
-  }
-
-  .article-head__meta-item dd {
-    font-size: var(--fs-sm, 14px);
-    color: var(--color-heading, #2b2640);
-    font-weight: var(--fw-medium, 500);
-    margin: 0;
-  }
-
+  /* 标签：摘要之后、横线之前，可点击跳转主题合集 */
   .article-head__tags {
     margin-top: var(--space-lg, 24px);
     display: flex;
@@ -443,10 +327,12 @@ const isDemo = meta.isDemo ?? false;
     border-radius: var(--radius-pill, 999px);
     text-decoration: none;
     border: 1px solid var(--color-brand-border, #d9ccff);
+    transition: background-color var(--transition-fast, 150ms ease);
   }
 
   .article-head__tag:hover {
     background-color: var(--color-brand-border, #d9ccff);
+    color: var(--color-brand-strong, #5a36f0);
   }
 
   /* 右栏容器 */
@@ -458,7 +344,7 @@ const isDemo = meta.isDemo ?? false;
 
   /* ────────────────────────────────────────
    * 响应式：平板（768–1023px）双栏
-   * 中正文 + 右来源，左栏元信息移入正文头部
+   * 中正文 + 右来源，左栏目录隐藏（头部元信息已统一在中栏）
    * ──────────────────────────────────────── */
   @media (max-width: 1023px) {
     .article-layout {
@@ -470,11 +356,6 @@ const isDemo = meta.isDemo ?? false;
 
     .article-layout__left {
       display: none;
-    }
-
-    /* 平板显示移动端元信息 */
-    .article-head__mobile-meta {
-      display: block;
     }
   }
 
@@ -503,6 +384,10 @@ const isDemo = meta.isDemo ?? false;
 
     .article-head__summary {
       font-size: 13px; /* 摘要固定 13px，移动端不变 */
+    }
+
+    .article-head__published {
+      font-size: var(--fs-xs, 12px);
     }
   }
 </style>

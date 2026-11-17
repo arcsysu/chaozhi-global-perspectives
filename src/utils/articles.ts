@@ -140,6 +140,48 @@ function toMeta(entry: ArticleEntry): ArticleMeta {
 }
 
 // ────────────────────────────────────────────────────────────
+// 合并接口（开发环境：published + Demo 统一数据源）
+// ────────────────────────────────────────────────────────────
+
+/**
+ * 合并文章元数据：在 ArticleMeta 基础上增加 isDemo 标志，
+ * 供首页"最新文章"统一列表区分公开文章与 Demo 文章的链接前缀。
+ */
+export interface MergedArticleMeta extends ArticleMeta {
+  /** 是否为 Demo 文章（开发环境合并用） */
+  isDemo?: boolean;
+}
+
+/**
+ * 开发环境合并数据源：将 Demo 文章转为 ArticleMeta 格式并入 published 列表。
+ * 生产环境直接返回 published 列表（Demo Collection 为空，自动隔离）。
+ * Demo 文章用 sourceTime 作为 publishedAt（模拟发布时间），供统一排序。
+ */
+async function getDevMergedBase(): Promise<MergedArticleMeta[]> {
+  const articles = await getThumbnailedArticles();
+  if (import.meta.env.PROD) return articles;
+
+  const demos = await getDemoArticleMetas();
+  const demoMetas: MergedArticleMeta[] = demos.map((d) => ({
+    id: d.id,
+    title: d.title,
+    summary: d.summary,
+    tags: d.tags,
+    publishedAt: d.sourceTime, // Demo 用 sourceTime 模拟发布时间
+    coverImage: d.coverImage,
+    articleSource: d.articleSource,
+    sourceTime: d.sourceTime,
+    isDemo: true,
+  }));
+  return [...articles, ...demoMetas].sort((a, b) => {
+    if (a.publishedAt !== b.publishedAt) {
+      return a.publishedAt < b.publishedAt ? 1 : -1;
+    }
+    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+  });
+}
+
+// ────────────────────────────────────────────────────────────
 // 公开读取接口
 // ────────────────────────────────────────────────────────────
 
@@ -172,6 +214,29 @@ export async function getArticleById(
 }
 
 /**
+ * 获取指定文章的下一篇导航（按 publishedAt 倒序，循环链接末尾→开头）。
+ * publishedAt 相等时以 id 升序作为次级排序，保证相邻关系稳定。
+ *
+ * 循环规则：
+ * - 多篇文章：最后一篇的下一篇为第一篇，确保每篇都有下一篇入口。
+ * - 单篇文章：返回 null，由 ArticleLayout 降级显示"返回文章列表"。
+ * - 当前文章不在集合中（异常）：返回 null。
+ *
+ * 仅在已发布文章序列中导航，不混入 Demo。
+ * Demo 使用独立的 getDemoNextArticle（见下方）。
+ */
+export async function getNextArticle(
+  id: string,
+): Promise<ArticleMeta | null> {
+  const articles = await getPublishedArticles(); // 已按 publishedAt 倒序
+  const index = articles.findIndex((a) => a.id === id);
+  if (index === -1 || articles.length <= 1) return null;
+  // 倒序数组中：index-1 是更早的文章（下一篇）
+  // 循环：index === 0（最新一篇）的下一篇是数组最后一篇
+  return articles[(index - 1 + articles.length) % articles.length];
+}
+
+/**
  * 获取指定文章的上一篇和下一篇（按 publishedAt 倒序相邻）。
  * publishedAt 相等时以 id 升序作为次级排序，保证相邻关系稳定。
  * 第一篇无上一篇，最后一篇无下一篇，对应字段为 null。
@@ -191,31 +256,28 @@ export async function getAdjacentArticles(
 }
 
 /**
- * 聚合全部已发布文章的标签，返回去重后的标签数组。
+ * 聚合全部文章标签（含 Demo，开发环境），返回去重后的标签数组。
  * 标签自由增长，不预设、不硬编码。
  */
 export async function getAllTags(): Promise<string[]> {
-  const articles = await getPublishedArticles();
-  const tagSet = new Set<string>();
-  for (const a of articles) {
-    for (const t of a.tags) tagSet.add(t);
-  }
-  return [...tagSet].sort((a, b) => a.localeCompare(b, 'zh-CN'));
+  const tagStats = await getTagStats();
+  return tagStats.map((s) => s.tag);
 }
 
 /**
- * 按标签筛选已发布文章，按发布时间倒序。
+ * 按标签筛选文章（含 Demo，开发环境），按时间倒序。
+ * 返回 MergedArticleMeta，供 ArticleList 自动区分链接前缀。
  */
-export async function getArticlesByTag(tag: string): Promise<ArticleMeta[]> {
-  const articles = await getPublishedArticles();
+export async function getArticlesByTag(tag: string): Promise<MergedArticleMeta[]> {
+  const articles = await getMergedThumbnailedArticles();
   return articles.filter((a) => a.tags.includes(tag));
 }
 
 /**
- * 按年份筛选已发布文章，按发布时间倒序。
+ * 按年份筛选文章（含 Demo，开发环境），按时间倒序。
  */
-export async function getArticlesByYear(year: string): Promise<ArticleMeta[]> {
-  const articles = await getPublishedArticles();
+export async function getArticlesByYear(year: string): Promise<MergedArticleMeta[]> {
+  const articles = await getMergedThumbnailedArticles();
   return articles.filter((a) => {
     const d = new Date(a.publishedAt);
     return !Number.isNaN(d.getTime()) && String(d.getUTCFullYear()) === year;
@@ -223,14 +285,14 @@ export async function getArticlesByYear(year: string): Promise<ArticleMeta[]> {
 }
 
 /**
- * 按年份+月份筛选已发布文章，按发布时间倒序。
+ * 按年份+月份筛选文章（含 Demo，开发环境），按时间倒序。
  * month 格式为两位数字符串，如 "01"、"10"。
  */
 export async function getArticlesByYearMonth(
   year: string,
   month: string,
-): Promise<ArticleMeta[]> {
-  const articles = await getPublishedArticles();
+): Promise<MergedArticleMeta[]> {
+  const articles = await getMergedThumbnailedArticles();
   return articles.filter((a) => {
     const d = new Date(a.publishedAt);
     return (
@@ -244,9 +306,10 @@ export async function getArticlesByYearMonth(
 /**
  * 生成时间归档树：按年 → 月 分组，每级含文章数量与 ID 列表。
  * 依据 publishedAt（ISO 8601 带时区）解析年月。
+ * 开发环境包含 Demo 文章（用 sourceTime 作为 publishedAt）。
  */
 export async function getArchiveTree(): Promise<ArchiveYearNode[]> {
-  const articles = await getPublishedArticles();
+  const articles = await getMergedThumbnailedArticles();
   const tree = new Map<string, Map<string, string[]>>();
 
   for (const a of articles) {
@@ -325,6 +388,16 @@ export async function getThumbnailedArticles(): Promise<ArticleMeta[]> {
   return metas.sort((a, b) => (a.publishedAt < b.publishedAt ? 1 : -1));
 }
 
+/**
+ * 开发环境合并列表（含缩略图）：published 文章 + Demo 文章统一数据源。
+ * 生产环境等价于 getThumbnailedArticles（Demo Collection 为空，自动隔离）。
+ * Demo 文章用 sourceTime 作为 publishedAt（模拟发布时间），标记 isDemo=true。
+ * 供首页"最新文章"统一列表使用。
+ */
+export async function getMergedThumbnailedArticles(): Promise<MergedArticleMeta[]> {
+  return getDevMergedBase();
+}
+
 // ────────────────────────────────────────────────────────────
 // 主题聚合接口
 // ────────────────────────────────────────────────────────────
@@ -332,9 +405,10 @@ export async function getThumbnailedArticles(): Promise<ArticleMeta[]> {
 /**
  * 聚合全部已发布文章的标签，返回带文章数量的标签统计列表。
  * 按文章数量降序排列，同数量按标签名称排序（中文 localeCompare）。
+ * 开发环境额外包含 Demo 文章的标签（生产自动隔离）。
  */
 export async function getTagStats(): Promise<TagStat[]> {
-  const articles = await getPublishedArticles();
+  const articles = await getMergedThumbnailedArticles();
   const counts = new Map<string, number>();
   for (const a of articles) {
     for (const t of a.tags) {
@@ -416,6 +490,28 @@ export async function getDemoArticleById(
 }
 
 /**
+ * 获取指定 Demo 文章的下一篇导航（按 sourceTime 倒序，循环链接末尾→开头）。
+ * sourceTime 相等时以 id 升序作为次级排序，保证相邻关系稳定。
+ *
+ * 循环规则：
+ * - 多篇 Demo：最后一篇的下一篇为第一篇，确保每篇都有下一篇入口。
+ * - 单篇 Demo：返回 null，由 ArticleLayout 降级显示"返回文章列表"。
+ * - Demo 在独立集合中循环，不链接到生产文章集合来凑数量。
+ *
+ * 仅开发环境有效，生产返回 null。
+ */
+export async function getDemoNextArticle(
+  id: string,
+): Promise<DemoArticleMeta | null> {
+  const demos = await getDemoArticleMetas(); // 已按 sourceTime 倒序
+  const index = demos.findIndex((d) => d.id === id);
+  if (index === -1 || demos.length <= 1) return null;
+  // 倒序数组中：index-1 是更早的文章（下一篇）
+  // 循环：index === 0 的下一篇是数组最后一篇
+  return demos[(index - 1 + demos.length) % demos.length];
+}
+
+/**
  * 获取指定 Demo 文章的上一篇和下一篇（按 sourceTime 倒序相邻）。
  * sourceTime 相等时以 id 升序作为次级排序，保证相邻关系稳定。
  * 仅开发环境有效，生产返回 { prev: null, next: null }。
@@ -443,21 +539,19 @@ export interface SearchIndexEntry {
   summary: string;
   publishedAt: string;
   coverImage: string | null;
+  /** 是否为 Demo 文章（开发环境合并用，控制链接前缀） */
+  isDemo?: boolean;
 }
 
-/**
- * 生成标题搜索用的静态索引数据。
- * 仅包含已发布文章（草稿和 Demo 不进入公开搜索索引）。
- * 开发环境额外包含 Demo 文章（明确标记），供本地预览搜索。
- */
 export async function getSearchIndex(): Promise<SearchIndexEntry[]> {
   const articles = await getThumbnailedArticles();
-  const index = articles.map((a) => ({
+  const index: SearchIndexEntry[] = articles.map((a) => ({
     id: a.id,
     title: a.title,
     summary: a.summary,
     publishedAt: a.publishedAt,
     coverImage: a.coverImage,
+    isDemo: false,
   }));
 
   // 开发环境追加 Demo 文章到搜索索引（生产构建 demo 为空，自动隔离）
@@ -466,10 +560,11 @@ export async function getSearchIndex(): Promise<SearchIndexEntry[]> {
     for (const d of demos) {
       index.push({
         id: d.id,
-        title: `[Demo] ${d.title}`,
+        title: d.title, // 不再加 [Demo] 前缀，用 isDemo 字段区分
         summary: d.summary,
         publishedAt: d.sourceTime,
         coverImage: d.coverImage,
+        isDemo: true,
       });
     }
   }

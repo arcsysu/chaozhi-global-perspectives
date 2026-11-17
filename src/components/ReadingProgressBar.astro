@@ -1,20 +1,25 @@
 ---
 /**
- * 固定阅读栏 + 阅读进度条 (ReadingProgressBar) — Header 切换模式
+ * 固定阅读栏 + 阅读进度条 (ReadingProgressBar) — 与 Header 协调切换
  *
  * 参考 Quanta Magazine 交互：
  * - 文章大标题可见时：显示正常网站 Header，阅读栏隐藏。
- * - 文章大标题离开视口后：Header 视觉隐藏，阅读栏滑入。
- * - 用户向上滚动重新看到标题时：恢复正常 Header。
+ * - 文章大标题离开视口后：普通 Header 上滑隐藏，阅读栏从顶部滑入。
+ * - 用户向上滚动重新看到标题时：阅读栏收回，普通 Header 重新展开。
  *
  * 精简阅读栏：
  * - 左侧缩小的 YatCC Logo 占位 + 当前文章标题（单行截断）。
  * - 高度约 48–56px（与 Header 一致，避免布局跳动）。
  * - 底部 2–3px 紫色阅读进度线。
  *
+ * 协调机制（与 Header 互斥，不重叠）：
+ * - body.has-reading-bar：标记当前页有阅读栏，Header 展开延迟 150ms 等阅读栏收回。
+ * - 阅读栏显示（hidden→visible）延迟 150ms，等普通 Header 先上滑隐藏。
+ * - 阅读栏隐藏（visible→hidden）无延迟，立即收回，普通 Header 随后展开。
+ * - 两者始终贴顶 top:0，不留空隙。
+ *
  * 实现：
- * - IntersectionObserver 监测文章标题可见性。
- * - 切换 body.reading-mode 类：隐藏 Header、显示阅读栏。
+ * - IntersectionObserver 监测文章标题可见性，切换 data-visible 属性。
  * - requestAnimationFrame 节流滚动计算进度。
  * - 进度范围仅文章正文（.article-body），不含页底导航和 Footer。
  * - 兼容 prefers-reduced-motion、移动端、窗口尺寸变化。
@@ -32,7 +37,7 @@ interface Props {
 const { title, backHref, backLabel } = Astro.props;
 ---
 
-<div class="reading-bar" id="reading-bar" aria-hidden="true" hidden>
+<div class="reading-bar" id="reading-bar" aria-hidden="true" data-visible="false">
   <div class="reading-bar__inner">
     <a href={backHref} class="reading-bar__logo" aria-label={backLabel}>
       {/* 缩小的 YatCC Logo 占位 */}
@@ -69,6 +74,9 @@ const { title, backHref, backLabel } = Astro.props;
   const articleTitle = document.querySelector<HTMLElement>('.article-head__title');
   const articleBody = document.querySelector<HTMLElement>('.article-body');
 
+  // 标记当前页有阅读栏，Header 展开延迟由此触发
+  document.body.classList.add('has-reading-bar');
+
   if (readingBar && articleTitle && articleBody) {
     let barVisible = false;
     let ticking = false;
@@ -82,9 +90,10 @@ const { title, backHref, backLabel } = Astro.props;
           const shouldShow = !entry.isIntersecting && entry.boundingClientRect.top < 0;
           if (shouldShow !== barVisible) {
             barVisible = shouldShow;
-            // 切换 body 类：隐藏 Header、显示阅读栏
-            document.body.classList.toggle('reading-mode', shouldShow);
-            readingBar.hidden = !shouldShow;
+            // 阅读栏显示时，隐藏普通 Header（互斥）；阅读栏收回时，恢复 Header
+            document.body.setAttribute('data-header-hidden', String(shouldShow));
+            // 用 data 属性驱动 CSS transform 动画（不用 hidden 属性，避免 display:none 破坏过渡）
+            readingBar.setAttribute('data-visible', String(shouldShow));
             readingBar.setAttribute('aria-hidden', String(!shouldShow));
           }
         }
@@ -122,7 +131,13 @@ const { title, backHref, backLabel } = Astro.props;
 </script>
 
 <style>
-  /* 阅读栏：固定定位，与 Header 同高，初始隐藏 */
+  /* 阅读栏：固定定位，与 Header 同高，transform 滑入滑出
+   * — data-visible="false"：translateY(-100%) 隐藏在视口上方
+   * — data-visible="true"：translateY(0) 滑入显示
+   * — 显示（hidden→visible）延迟 150ms，等普通 Header 先上滑隐藏，避免叠加。
+   * — 隐藏（visible→hidden）无延迟，立即收回。
+   * — pointer-events 在隐藏时关闭，避免遮挡点击。
+   */
   .reading-bar {
     position: fixed;
     top: 0;
@@ -132,16 +147,16 @@ const { title, backHref, backLabel } = Astro.props;
     background-color: var(--color-surface, #ffffff);
     box-shadow: var(--shadow-header-float, 0 2px 12px rgba(43, 38, 64, 0.08));
     transform: translateY(-100%);
-    transition: transform var(--transition-base, 250ms ease);
+    transition: transform var(--transition-base, 250ms) cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: transform;
+    pointer-events: none;
   }
 
-  .reading-bar[hidden] {
-    display: none;
-  }
-
-  /* 阅读栏可见时滑入 */
-  .reading-bar:not([hidden]) {
+  /* 阅读栏可见时滑入（显示延迟 150ms，等 Header 先隐藏） */
+  .reading-bar[data-visible='true'] {
     transform: translateY(0);
+    pointer-events: auto;
+    transition-delay: 150ms;
   }
 
   .reading-bar__inner {
@@ -207,10 +222,14 @@ const { title, backHref, backLabel } = Astro.props;
     }
   }
 
-  /* 尊重 prefers-reduced-motion：禁用过渡 */
+  /* 尊重 prefers-reduced-motion：禁用过渡与延迟 */
   @media (prefers-reduced-motion: reduce) {
     .reading-bar {
       transition: none;
+    }
+
+    .reading-bar[data-visible='true'] {
+      transition-delay: 0ms;
     }
 
     .reading-bar__progress-fill {
@@ -219,17 +238,8 @@ const { title, backHref, backLabel } = Astro.props;
   }
 </style>
 
-<!-- 全局样式：reading-mode 下隐藏 Header -->
-<style is:global>
-  /* 阅读模式：Header 视觉隐藏（不占顶部空间），由阅读栏替代 */
-  body.reading-mode #site-header {
-    visibility: hidden;
-    opacity: 0;
-    transition: opacity var(--transition-fast, 150ms ease);
-  }
-
-  /* 平滑过渡 */
-  #site-header {
-    transition: opacity var(--transition-fast, 150ms ease);
-  }
-</style>
+<!--
+  Header 隐藏/展开由 body[data-header-hidden] 属性驱动，规则定义在 Header.astro 的
+  scoped <style> 中。本组件通过 IntersectionObserver 切换 data-header-hidden 与
+  reading-bar 的 data-visible，实现两者互斥协调。
+-->

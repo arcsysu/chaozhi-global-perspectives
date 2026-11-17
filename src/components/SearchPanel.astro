@@ -6,7 +6,7 @@
  * - 点击搜索图标 → 展开搜索框（覆盖层下拉）。
  * - 标题搜索（不含正文），支持中英文，英文大小写不敏感。
  * - 实时输入实时搜索（防抖 150ms）。
- * - 结果展示标题、摘要、日期、可选缩略图。
+ * - 结果仅展示标题与发布日期，简洁列表风格。
  * - 无结果显示空状态。
  * - ESC 关闭，关闭后焦点回到触发按钮。
  * - 移动端友好：全宽下拉，触摸友好的结果项。
@@ -15,7 +15,7 @@
  * 无数据库、无搜索服务端、无第三方库。
  *
  * 内容隔离：
- * - Demo 文章在开发环境以 [Demo] 前缀出现在索引中，链接前缀 /demo/。
+ * - Demo 文章在开发环境通过 isDemo 字段标识，链接前缀 /demo/。
  * - 生产构建索引不含 Demo。
  */
 ---
@@ -106,6 +106,7 @@
     summary: string;
     publishedAt: string;
     coverImage: string | null;
+    isDemo?: boolean;
   }
 
   const panel = document.getElementById('search-panel');
@@ -177,28 +178,14 @@
 
     const html = results
       .map((e) => {
-        const isDemo = e.title.startsWith('[Demo]');
-        const titleDisplay = isDemo ? e.title : e.title;
+        const isDemo = e.isDemo === true;
         const linkPrefix = isDemo ? `${baseUrl}demo/` : `${baseUrl}articles/`;
         const href = `${linkPrefix}${encodeURIComponent(e.id)}/`;
-        const thumb = e.coverImage
-          ? `<img src="${e.coverImage}" alt="" class="search-result__thumb" loading="lazy" />`
-          : '';
-        const demoBadge = isDemo
-          ? '<span class="search-result__demo">Demo</span>'
-          : '';
 
         return `
           <a href="${href}" class="search-result" role="option">
-            ${thumb}
-            <div class="search-result__body">
-              <div class="search-result__title-row">
-                ${demoBadge}
-                <span class="search-result__title">${escapeHtml(titleDisplay)}</span>
-              </div>
-              <p class="search-result__summary">${escapeHtml(e.summary)}</p>
-              <time class="search-result__date">${formatDate(e.publishedAt)}</time>
-            </div>
+            <span class="search-result__title">${escapeHtml(e.title)}</span>
+            <time class="search-result__date">${formatDate(e.publishedAt)}</time>
           </a>
         `;
       })
@@ -388,99 +375,84 @@
     padding: var(--space-xl, 32px) 0;
   }
 
-  .search-panel__empty {
+  /* ─── 搜索结果项 & 空状态 ─────────────────────────────────────
+   * 关键根因：结果由 renderResults() 通过 innerHTML 动态生成，这些 DOM 节点
+   * 不带 Astro scoped 注入的 data-astro-cid 属性。因此 scoped 选择器会编译成
+   * .search-result[data-astro-cid-lsfpl5zw] 而无法命中动态节点，导致标题/日期
+   * 挤成一行、分隔线和内边距全部失效。
+   *
+   * 修复：把【整个复合选择器】包进 :global()，例如 :global(.search-panel__results
+   * .search-result)，使规则不带 cid 约束、对 innerHTML 节点生效；同时以
+   * .search-panel__results 作前缀限定作用域，避免污染页面其它组件。
+   * （注意：写 :global(.search-panel__results) .search-result 是错的——Astro 只
+   *  让前半段全局，后半段 .search-result 仍会被加 cid，实测不生效。）
+   * 空状态文案也由 innerHTML 动态生成，同理处理。
+   */
+
+  /* 每篇文章：独立块级列表项，独占一行，浅灰紫分隔线 */
+  :global(.search-panel__results .search-result) {
+    display: block;
+    padding: var(--space-md, 14px) var(--space-md, 12px);
+    border-bottom: 1px solid #d9d2e6;
+    text-decoration: none;
+    transition: background-color var(--transition-fast, 0.15s);
+  }
+
+  :global(.search-panel__results .search-result:last-child) {
+    border-bottom: none;
+  }
+
+  /* 标题：16px，weight 600，深灰紫 #30273B（第一行） */
+  :global(.search-panel__results .search-result__title) {
+    display: block;
+    font-size: 16px;
+    font-weight: 600;
+    color: #30273b;
+    line-height: 1.4;
+    transition: color var(--transition-fast, 0.15s);
+  }
+
+  /* 日期：12px，常规字重，浅灰紫 #91879C（第二行，独占一行） */
+  :global(.search-panel__results .search-result__date) {
+    display: block;
+    margin-top: 4px;
+    font-size: 12px;
+    font-weight: 400;
+    color: #91879c;
+  }
+
+  /* 悬停 / 键盘聚焦：整条结果区域淡紫背景 #F3ECFF，其它条目不受影响 */
+  :global(.search-panel__results .search-result:hover),
+  :global(.search-panel__results .search-result:focus-visible) {
+    background-color: #f3ecff;
+    outline: none;
+  }
+
+  /* 悬停时标题转品牌紫强调 */
+  :global(.search-panel__results .search-result:hover .search-result__title) {
+    color: var(--color-brand, #6d4aff);
+  }
+
+  /* 键盘 Tab 聚焦：清晰内嵌焦点环 */
+  :global(.search-panel__results .search-result:focus-visible) {
+    box-shadow: inset 0 0 0 2px var(--color-brand, #6d4aff);
+  }
+
+  /* 空状态（innerHTML 动态生成，需 :global 限定在结果容器内） */
+  :global(.search-panel__results .search-panel__empty) {
     text-align: center;
     color: var(--color-text-muted, #6b7280);
     font-size: var(--fs-sm, 14px);
     padding: var(--space-xl, 32px) 0;
   }
 
-  /* 搜索结果项 */
-  .search-result {
-    display: flex;
-    gap: var(--space-md, 12px);
-    padding: var(--space-sm, 8px) var(--space-md, 12px);
-    border-radius: var(--radius-md, 8px);
-    text-decoration: none;
-    color: var(--color-text, #1f2937);
-    transition: background-color var(--transition-fast, 0.15s);
-  }
-
-  .search-result:hover {
-    background-color: var(--color-brand-soft, #f5f3ff);
-  }
-
-  .search-result__thumb {
-    width: 64px;
-    height: 48px;
-    object-fit: cover;
-    border-radius: var(--radius-sm, 4px);
-    flex-shrink: 0;
-  }
-
-  .search-result__body {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .search-result__title-row {
-    display: flex;
-    align-items: center;
-    gap: var(--space-xs, 4px);
-  }
-
-  .search-result__demo {
-    font-size: var(--fs-xs, 12px);
-    padding: 1px 6px;
-    background-color: #fef3c7;
-    color: #92400e;
-    border-radius: var(--radius-sm, 4px);
-    font-weight: var(--fw-medium, 500);
-    flex-shrink: 0;
-  }
-
-  .search-result__title {
-    font-size: var(--fs-sm, 14px);
-    font-weight: var(--fw-semibold, 600);
-    color: var(--color-heading, #111827);
-    line-height: var(--lh-tight, 1.3);
-    /* 标题过长截断 */
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .search-result__summary {
-    margin-top: 2px;
-    font-size: var(--fs-xs, 12px);
-    color: var(--color-text-muted, #6b7280);
-    line-height: var(--lh-normal, 1.5);
-    /* 限制两行 */
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-
-  .search-result__date {
-    display: block;
-    margin-top: 2px;
-    font-size: var(--fs-xs, 12px);
-    color: var(--color-text-muted, #9ca3af);
-  }
-
-  /* 移动端：全宽，触摸友好 */
+  /* 移动端：全宽，触摸友好的留白 */
   @media (max-width: 768px) {
     .search-panel__inner {
       padding: var(--space-sm, 8px) var(--space-md, 12px) var(--space-md, 12px);
     }
 
-    .search-result__thumb {
-      width: 56px;
-      height: 42px;
-    }
-
-    .search-result {
+    :global(.search-panel__results .search-result) {
       padding: var(--space-md, 12px);
     }
   }

@@ -20,7 +20,7 @@ import ArticleLayout from '@/layouts/ArticleLayout.astro';
 import {
   getPublishedArticles,
   getArticleById,
-  getAdjacentArticles,
+  getNextArticle,
 } from '@/utils/articles';
 import type { ArticleHeadMeta } from '@/layouts/ArticleLayout.astro';
 import { withBase } from '@/utils/site';
@@ -53,8 +53,8 @@ if (!entry) {
 const { Content, headings } = await render(entry);
 const data = entry.data;
 
-// 获取上一篇/下一篇导航
-const { prev, next } = await getAdjacentArticles(id);
+// 获取下一篇导航（循环：末篇→首篇；单篇降级为 null）
+const next = await getNextArticle(id);
 
 /**
  * 格式化 ISO 时间为中文显示（本地时区）。
@@ -65,21 +65,6 @@ function formatTime(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
-}
-
-/**
- * sourceType 枚举转中文标签。
- */
-function sourceTypeLabel(type: typeof data.sourceType): string | undefined {
-  if (!type) return undefined;
-  const labels: Record<string, string> = {
-    'report': '报告',
-    'press-release': '新闻稿',
-    'docx': '文档',
-    'web': '网络资料',
-    'other': '其他',
-  };
-  return labels[type] ?? type;
 }
 
 // 构建 ArticleLayout 所需的头部元数据
@@ -100,7 +85,6 @@ const meta: ArticleHeadMeta = {
   sourceTimeIso: sourceTime,
   publishedAtLabel: publishedAtIso ? formatTime(publishedAtIso) : null,
   publishedAtIso,
-  sourceTypeLabel: sourceTypeLabel(data.sourceType),
   isDemo: false,
 };
 ---
@@ -109,7 +93,6 @@ const meta: ArticleHeadMeta = {
   meta={meta}
   headings={headings}
   markdownBody={entry.body ?? ''}
-  prev={prev}
   next={next}
   linkPrefix={withBase('/articles/')}
 >

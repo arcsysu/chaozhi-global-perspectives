@@ -145,12 +145,19 @@ function isActive(item: (typeof navItems)[number]): boolean {
     observer.observe(searchPanel, { attributes: true, attributeFilter: ['hidden'] });
   }
 
+  /** 移动端菜单是否展开（展开时不让滚动隐藏 Header） */
+  function mobileNavOpen(): boolean {
+    return panel != null && !panel.hidden;
+  }
+
   if (toggle && panel) {
     toggle.addEventListener('click', () => {
       const expanded = toggle.getAttribute('aria-expanded') === 'true';
       toggle.setAttribute('aria-expanded', String(!expanded));
       toggle.setAttribute('aria-label', expanded ? '展开导航菜单' : '收起导航菜单');
       panel.hidden = expanded;
+      // 展开/收起时强制 Header 可见
+      document.body.setAttribute('data-header-hidden', 'false');
     });
 
     // 点击导航链接后自动收起
@@ -172,15 +179,117 @@ function isActive(item: (typeof navItems)[number]): boolean {
       }
     });
   }
+
+  // ──────────────────────────────────────────────
+  // Header 滚动隐藏/展开协调器
+  // — 贴顶 top:0；下滑隐藏；上滑展开；顶部完整显示。
+  // — 文章页与阅读栏互斥：body.has-reading-bar 时，阅读栏负责标题离开视口的切换，
+  //   本协调器仅处理"标题可见区"之外的滚动隐藏/展开，避免竞争。
+  // — 移动端菜单展开时禁用隐藏，避免导航被收走。
+  // ──────────────────────────────────────────────
+
+  const SCROLL_HIDE_THRESHOLD = 12; // 滚动超过 12px 才允许隐藏（避免页面顶部抖动）
+  const SCROLL_DELTA_THRESHOLD = 8; // 滚动方向变化需超过 8px（触控板滞后，防闪烁）
+
+  let lastScrollY = window.scrollY;
+  let ticking = false;
+  let hidden = false; // 当前 Header 是否隐藏
+
+  function isReadingBarVisible(): boolean {
+    const bar = document.getElementById('reading-bar');
+    return bar != null && bar.getAttribute('data-visible') === 'true';
+  }
+
+  function updateHeaderState(): void {
+    ticking = false;
+    const currentY = window.scrollY;
+    const delta = currentY - lastScrollY;
+
+    // 顶部：完整显示
+    if (currentY <= SCROLL_HIDE_THRESHOLD) {
+      if (hidden) {
+        hidden = false;
+        document.body.setAttribute('data-header-hidden', 'false');
+      }
+      lastScrollY = currentY;
+      return;
+    }
+
+    // 移动端菜单展开时不隐藏
+    if (mobileNavOpen()) {
+      lastScrollY = currentY;
+      return;
+    }
+
+    // 文章页：阅读栏可见时（标题已离开视口）让出给阅读栏，不在此隐藏普通 Header
+    // 阅读栏自身在标题离开时通过 body.has-reading-bar 的 reading-mode 处理。
+    // 此处只在阅读栏不可见、且标题仍在视口附近时按方向隐藏/展开。
+    if (document.body.classList.contains('has-reading-bar') && isReadingBarVisible()) {
+      lastScrollY = currentY;
+      return;
+    }
+
+    // 下滑超过阈值 → 隐藏
+    if (delta > SCROLL_DELTA_THRESHOLD && !hidden) {
+      hidden = true;
+      document.body.setAttribute('data-header-hidden', 'true');
+    }
+    // 上滑超过阈值 → 展开
+    else if (delta < -SCROLL_DELTA_THRESHOLD && hidden) {
+      hidden = false;
+      document.body.setAttribute('data-header-hidden', 'false');
+    }
+
+    lastScrollY = currentY;
+  }
+
+  function onScroll(): void {
+    if (!ticking) {
+      window.requestAnimationFrame(updateHeaderState);
+      ticking = true;
+    }
+  }
+
+  // 初始化默认可见
+  document.body.setAttribute('data-header-hidden', 'false');
+  window.addEventListener('scroll', onScroll, { passive: true });
 </script>
 
 <style>
+  /* 普通页眉：居中悬浮实体，贴合视口顶部（无顶部间距）
+   * — position: sticky 吸顶 top:0；max-width 限制宽度居中；margin-inline 留侧边距。
+   * — transform: translateY() 由 body[data-header-hidden] 驱动：下滑隐藏、上滑展开。
+   * — 文章页（body.has-reading-bar）下，页眉显示（hidden→visible）延迟 150ms，
+   *   等阅读栏先收回，避免两个栏同时叠加；隐藏（visible→hidden）不延迟。
+   */
   .header {
     position: sticky;
     top: 0;
     z-index: var(--z-header);
+    max-width: var(--width-content, 72rem);
+    margin-inline: auto;
+    margin-top: 0;
     background-color: var(--color-surface);
-    box-shadow: var(--shadow-header);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg, 12px);
+    box-shadow: var(--shadow-header-float, 0 2px 12px rgba(43, 38, 64, 0.06));
+    transform: translateY(0);
+    transition:
+      transform var(--transition-base, 250ms) cubic-bezier(0.4, 0, 0.2, 1),
+      opacity var(--transition-base, 250ms) ease;
+    will-change: transform;
+  }
+
+  /* 下滑隐藏：body[data-header-hidden='true'] 时上滑收回视口外 */
+  body[data-header-hidden='true'] #site-header {
+    transform: translateY(-110%);
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* 文章页：页眉重新展开时延迟 150ms（等阅读栏收回），避免叠加闪烁 */
+  body.has-reading-bar[data-header-hidden='false'] #site-header {
+    transition-delay: 150ms;
   }
 
   .header__inner {
@@ -189,6 +298,7 @@ function isActive(item: (typeof navItems)[number]): boolean {
     justify-content: space-between;
     gap: var(--space-lg);
     min-height: var(--height-header);
+    padding-inline: var(--space-lg);
   }
 
   /* 品牌区 */
@@ -375,11 +485,22 @@ function isActive(item: (typeof navItems)[number]): boolean {
     font-weight: var(--fw-semibold);
   }
 
-  /* 响应式：≤768px 切换为移动导航 */
+  /* 响应式：≤768px 切换为移动导航
+   * 移动端：页眉贴顶 top:0，近屏宽，仅保留少量左右边距。
+   */
   @media (max-width: 768px) {
+    .header {
+      top: 0;
+      margin-top: 0;
+      margin-inline: var(--space-xs, 8px);
+      max-width: none;
+      border-radius: var(--radius-md, 8px);
+    }
+
     .header__inner {
       min-height: var(--height-header-mobile);
       gap: var(--space-sm);
+      padding-inline: var(--space-sm);
     }
 
     .header__brief {
@@ -396,6 +517,25 @@ function isActive(item: (typeof navItems)[number]): boolean {
 
     .mobile-nav {
       display: block;
+      /* 移动端折叠面板继承页眉的圆角与边框 */
+      border-radius: var(--radius-md, 8px);
+      margin-top: var(--space-2xs, 4px);
+    }
+  }
+
+  /* 尊重 prefers-reduced-motion：禁用 transform 过渡 */
+  @media (prefers-reduced-motion: reduce) {
+    .header {
+      transition: opacity var(--transition-fast, 150ms) ease;
+    }
+
+    body[data-header-hidden='true'] #site-header {
+      transform: none;
+      transition-delay: 0ms;
+    }
+
+    body.has-reading-bar[data-header-hidden='false'] #site-header {
+      transition-delay: 0ms;
     }
   }
 </style>

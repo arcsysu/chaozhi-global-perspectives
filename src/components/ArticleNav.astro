@@ -3,9 +3,11 @@
  * 文章底部导航 (ArticleNav)
  *
  * 简洁的"下一篇文章"右箭头风格：
- * - 仅展示下一篇（按 publishedAt 排序，ID 次级排序保证稳定）
- * - 小标题"继续阅读" + 下一篇文章标题 + 右箭头
- * - 无下一篇时隐藏整个区域
+ * - 有下一篇：小标题"继续阅读" + 下一篇文章标题 + 右箭头。
+ * - 无下一篇（单篇文章降级）：显示"返回文章列表" + 右箭头。
+ *
+ * 下一篇由 articles.ts 的循环逻辑提供（末篇循环到首篇），
+ * 因此正常情况下总有 next；仅当集合只有一篇文章时 next 为 null。
  *
  * Demo 文章使用隔离的本地预览导航（linkPrefix=/demo/），不泄露到生产。
  */
@@ -19,15 +21,22 @@ interface NavItem {
 interface Props {
   /** 上一篇（保留接口兼容，当前不展示） */
   prev?: NavItem | null;
-  /** 下一篇 */
+  /** 下一篇（循环导航，单篇降级时为 null） */
   next: NavItem | null;
   /** 文章详情页链接前缀（公开 /articles/ 或 Demo /demo/） */
   linkPrefix: string;
   /** 是否 Demo 预览 */
   isDemo?: boolean;
+  /** 单篇降级时的返回链接（默认 /） */
+  fallbackHref?: string;
 }
 
-const { next, linkPrefix, isDemo = false } = Astro.props;
+const {
+  next,
+  linkPrefix,
+  isDemo = false,
+  fallbackHref = withBase('/'),
+} = Astro.props;
 
 function buildHref(id: string): string {
   return withBase(`${linkPrefix}${encodeURIComponent(id)}/`);
@@ -35,13 +44,34 @@ function buildHref(id: string): string {
 ---
 
 {
-  next && (
+  next ? (
     <nav class="article-nav" aria-label={isDemo ? 'Demo 下一篇文章' : '下一篇文章'}>
       <a href={buildHref(next.id)} class="article-nav__link">
         <span class="article-nav__label">继续阅读</span>
         <span class="article-nav__title" title={next.title}>
           {next.title}
         </span>
+        <svg
+          class="article-nav__arrow"
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <line x1="5" y1="12" x2="19" y2="12" />
+          <polyline points="12 5 19 12 12 19" />
+        </svg>
+      </a>
+    </nav>
+  ) : (
+    <nav class="article-nav" aria-label="返回文章列表">
+      <a href={fallbackHref} class="article-nav__link">
+        <span class="article-nav__label">返回文章列表</span>
         <svg
           class="article-nav__arrow"
           width="20"

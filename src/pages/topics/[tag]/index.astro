@@ -17,8 +17,10 @@ import { withBase } from '@/utils/site';
 
 export async function getStaticPaths() {
   const tagStats = await getTagStats();
+  // 注意：Astro 会自动对 getStaticPaths 的 params 值进行 URL 编码，
+  // 此处传入原始（未编码）tag 即可，切勿 encodeURIComponent 否则双重编码导致路由不匹配。
   return tagStats.map(({ tag }) => ({
-    params: { tag: encodeURIComponent(tag) },
+    params: { tag },
     props: { tag },
   }));
 }

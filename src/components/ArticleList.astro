@@ -9,15 +9,15 @@
  * 支持分页：通过 limit 控制每页显示数量，超过则截断。
  */
 import ArticleCard from './ArticleCard.astro';
-import type { ArticleMeta, DemoArticleMeta } from '@/utils/articles';
+import type { ArticleMeta, DemoArticleMeta, MergedArticleMeta } from '@/utils/articles';
 
 interface Props {
-  articles: ArticleMeta[] | DemoArticleMeta[];
+  articles: ArticleMeta[] | DemoArticleMeta[] | MergedArticleMeta[];
   /** 每页显示数量，0 或不传表示全部 */
   limit?: number;
   /** 是否显示标签（首页不显示） */
   showTags?: boolean;
-  /** 文章详情页链接前缀 */
+  /** 文章详情页链接前缀（默认 /articles/，MergedArticleMeta 会按 isDemo 自动切换） */
   linkPrefix?: string;
   /** 空状态提示文本 */
   emptyText?: string;
@@ -27,7 +27,7 @@ const {
   articles,
   limit = 0,
   showTags = false,
-  linkPrefix = '/articles/',
+  linkPrefix,
   emptyText = '暂无文章',
 } = Astro.props;
 
@@ -48,20 +48,26 @@ function formatDate(iso: string): string {
   ) : (
     <section class="article-list" aria-label="文章列表">
       {list.map((article) => {
-        const isDemo = 'internal' in article && (article as DemoArticleMeta).internal;
+        // MergedArticleMeta 优先判断 isDemo；兼容旧 DemoArticleMeta 的 internal 字段
+        const isMergedDemo = 'isDemo' in article && (article as MergedArticleMeta).isDemo === true;
+        const isLegacyDemo = !isMergedDemo && 'internal' in article && (article as DemoArticleMeta).internal === true;
+        const isDemo = isMergedDemo || isLegacyDemo;
+        // MergedArticleMeta：按 isDemo 自动切换链接前缀；否则用传入 linkPrefix（默认 /articles/）
+        const resolvedPrefix = linkPrefix ?? (isDemo ? '/demo/' : '/articles/');
+        const dateIso = 'publishedAt' in article
+          ? article.publishedAt
+          : (article as DemoArticleMeta).sourceTime;
         return (
           <ArticleCard
             id={article.id}
             title={article.title}
             summary={article.summary}
-            dateLabel={formatDate(
-              'publishedAt' in article ? article.publishedAt : (article as DemoArticleMeta).sourceTime
-            )}
-            dateIso={'publishedAt' in article ? article.publishedAt : (article as DemoArticleMeta).sourceTime}
+            dateLabel={formatDate(dateIso)}
+            dateIso={dateIso}
             coverImage={article.coverImage}
             showTags={showTags}
             tags={article.tags}
-            linkPrefix={linkPrefix}
+            linkPrefix={resolvedPrefix}
             isDemo={isDemo}
           />
         );

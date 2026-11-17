@@ -19,7 +19,7 @@ import type { ArticleHeadMeta } from '@/layouts/ArticleLayout.astro';
 import {
   getDemoArticleMetas,
   getDemoArticleById,
-  getAdjacentDemoArticles,
+  getDemoNextArticle,
 } from '@/utils/articles';
 import { withBase } from '@/utils/site';
 
@@ -59,8 +59,8 @@ if (!entry) {
 const { Content, headings } = await render(entry);
 const data = entry.data;
 
-// 获取上一篇/下一篇导航（Demo 隔离导航，仅开发环境有效）
-const { prev, next } = await getAdjacentDemoArticles(id);
+// 获取下一篇导航（Demo 独立集合循环，不链接到生产文章集合）
+const next = await getDemoNextArticle(id);
 
 /**
  * 格式化 ISO 时间为中文显示（本地时区）。
@@ -70,21 +70,6 @@ function formatTime(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
-}
-
-/**
- * sourceType 枚举转中文标签。
- */
-function sourceTypeLabel(type: typeof data.sourceType): string | undefined {
-  if (!type) return undefined;
-  const labels: Record<string, string> = {
-    'report': '报告',
-    'press-release': '新闻稿',
-    'docx': '文档',
-    'web': '网络资料',
-    'other': '其他',
-  };
-  return labels[type] ?? type;
 }
 
 const sourceTime =
@@ -105,7 +90,6 @@ const meta: ArticleHeadMeta = {
   sourceTimeIso: sourceTime,
   publishedAtLabel: publishedAtIso ? formatTime(publishedAtIso) : null,
   publishedAtIso,
-  sourceTypeLabel: sourceTypeLabel(data.sourceType),
   isDemo: true,
 };
 ---
@@ -116,7 +100,6 @@ const meta: ArticleHeadMeta = {
   markdownBody={entry.body ?? ''}
   backHref={withBase('/')}
   backLabel="返回首页"
-  prev={prev}
   next={next}
   linkPrefix={withBase('/demo/')}
 >
