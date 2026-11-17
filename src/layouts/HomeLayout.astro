@@ -1,0 +1,515 @@
+---
+/**
+ * HomeLayout.astro — 首页布局（含 Hero + 粒子背景 + 最新文章列表）
+ *
+ * 被 index.astro（第一页）和 /page/[page]/index.astro（第 2 页起）共用，
+ * 确保直接访问 /page/2/ 时也渲染完整首页结构（Hero + 粒子 + Header + Footer）。
+ *
+ * 客户端分页：
+ * - 点击分页链接时，JS 拦截默认跳转，fetch 目标页面 HTML，
+ *   提取 #home-article-list 内容进行局部替换。
+ * - 使用 History API 更新 URL（/page/2/），不整页刷新。
+ * - popstate 时检查 DOM 页码与 URL 页码是否一致，不一致才 fetch+swap。
+ * - bfcache 恢复时 DOM 已正确，无需 swap。
+ * - 无 JS 后备：分页链接是真正的 <a href>，直接访问 /page/N/ 渲染完整首页。
+ */
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import ArticleList from '@/components/ArticleList.astro';
+import Pagination from '@/components/Pagination.astro';
+import ParticleBackground from '@/components/ParticleBackground.astro';
+import ScienceMap from '@/components/ScienceMap.astro';
+import '@/styles/page.css';
+import { withBase } from '@/utils/site';
+import { getMergedThumbnailedArticles } from '@/utils/articles';
+import { paginate } from '@/utils/pagination';
+
+interface Props {
+  page?: number;
+}
+
+const { page = 1 } = Astro.props;
+const allArticles = await getMergedThumbnailedArticles();
+const result = paginate(allArticles, page);
+
+const pageTitle = page === 1 ? '首页' : `最新文章 · 第 ${page} 页`;
+const appendSiteName = page === 1 ? false : true;
+---
+
+<BaseLayout title={pageTitle} appendSiteName={appendSiteName}>
+  {/* 得意黑（Smiley Sans）字体：SIL OFL 1.1 开源，仅用于 Hero 标题。
+    * font-display: swap → 加载前回退系统粗体，加载后无缝替换。
+    * 通过 jsDelivr CDN 加载 woff2，不增加构建依赖。 */}
+  <link
+    rel="preload"
+    href="https://cdn.jsdelivr.net/npm/cn-fontsource-smiley-sans-oblique@1.1.0/font.woff2"
+    as="font"
+    type="font/woff2"
+    crossorigin
+  />
+  <link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/cn-fontsource-smiley-sans-oblique@1.1.0/font.css"
+  />
+
+  {/* 动态粒子背景：fixed 覆盖整视口，z-index:-1，作为全页底色层 */}
+  <ParticleBackground />
+
+  {/* 全宽 Hero：左右两栏布局，叠在粒子背景上。
+    * 左侧：标题 + 简介 + 按钮（约 52%）
+    * 右侧：动态 Science Map（约 48%）
+    * 桌面高度约 78vh，移动端改为上下布局 */}
+  <section class="home-hero" id="top">
+    <div class="home-hero__inner">
+      {/* 左侧：宣传文字区 */}
+      <div class="home-hero__left">
+        <h1 class="home-hero__title">
+          <span class="home-hero__title-line home-hero__title-line--1">看见科学的</span>
+          <span class="home-hero__title-line home-hero__title-line--2">下一步。</span>
+        </h1>
+        <p class="home-hero__desc">
+          聚焦全球高性能计算与科学智能前沿，洞察计算、算法与科学发现之间的联系。
+        </p>
+        <div class="home-hero__actions">
+          <a href="#latest-articles" class="home-hero__btn home-hero__btn--primary">
+            浏览最新文章
+          </a>
+          <a href={withBase('/topics/')} class="home-hero__btn home-hero__btn--ghost">
+            按主题探索
+          </a>
+        </div>
+      </div>
+      {/* 右侧：动态 Science Map */}
+      <div class="home-hero__right">
+        <ScienceMap />
+      </div>
+    </div>
+  </section>
+
+  <!-- 最新文章：浅色区域，内容宽度受约束、左对齐，右侧自然留白 -->
+  <section class="home-latest" id="latest-articles" aria-label="最新文章">
+    <div class="home-latest__inner">
+      <h2 class="home-latest__title">最新文章</h2>
+      {/* 文章列表容器：客户端分页时仅替换此 div 的 innerHTML。
+       * data-page 用于 popstate 时判断 DOM 是否与 URL 匹配（避免 bfcache 恢复时重复 swap）。 */}
+      <div id="home-article-list" data-page={result.page}>
+        <ArticleList articles={result.items} />
+        <Pagination
+          basePath="/"
+          current={result.page}
+          pages={result.pages}
+          total={result.total}
+          anchor="#latest-articles"
+        />
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+
+<script>
+  /**
+   * 首页客户端分页脚本
+   *
+   * 工作原理：
+   * 1. 点击分页链接 → 拦截默认跳转 → fetch 目标 URL → 提取 #home-article-list → 局部替换
+   * 2. pushState 更新 URL（不含 hash），不整页刷新
+   * 3. popstate 时检查 data-page 与 URL 页码是否一致，不一致才 fetch+swap
+   * 4. bfcache 恢复时 DOM 已正确（data-page 匹配），跳过 swap
+   * 5. fetch 失败时回退为整页跳转（渐进增强）
+   * 6. 支持 prefers-reduced-motion（跳过淡入淡出和平滑滚动）
+   */
+  const containerEl = document.getElementById('home-article-list');
+  if (containerEl) {
+    // 引入 definitively-typed const：避免 TS 在嵌套 async function 中丢失 narrowing
+    const container: HTMLElement = containerEl;
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let abortController: AbortController | null = null;
+
+    /** 从 URL 提取页码（/page/2/ → 2，/ → 1） */
+    function getPageFromUrl(url: string): number {
+      const match = url.match(/\/page\/(\d+)/);
+      return match ? parseInt(match[1], 10) : 1;
+    }
+
+    /** 从完整 href 中提取干净的 pathname（去除 hash 和 origin） */
+    function cleanUrl(href: string): string {
+      try {
+        const url = new URL(href, window.location.origin);
+        return url.pathname + url.search;
+      } catch {
+        return href;
+      }
+    }
+
+    /** 平滑滚动到 #latest-articles 顶部（CSS scroll-margin-top 自动避开 Header） */
+    function scrollToLatest() {
+      const target = document.getElementById('latest-articles');
+      if (!target) return;
+      target.scrollIntoView({
+        behavior: reducedMotion ? 'auto' : 'smooth',
+        block: 'start',
+      });
+    }
+
+    /** 将当前滚动位置保存到 history state（供 popstate 恢复） */
+    function saveScrollState() {
+      const state = history.state || {};
+      history.replaceState({ ...state, scrollY: window.scrollY }, '');
+    }
+
+    /**
+     * fetch 目标页面，提取 #home-article-list 内容并局部替换。
+     * @param targetUrl  干净 URL（不含 hash）
+     * @param options    scrollTo: 'latest'（滚到列表顶部）| 'restore'（恢复指定位置）
+     */
+    async function fetchAndSwap(
+      targetUrl: string,
+      options: { scrollTo?: 'latest' | 'restore'; restoreY?: number } = {}
+    ): Promise<void> {
+      // 取消上一个进行中的 fetch（快速连续点击分页时）
+      if (abortController) abortController.abort();
+      abortController = new AbortController();
+
+      try {
+        // 淡出当前列表
+        if (!reducedMotion) {
+          container.style.opacity = '0';
+          await new Promise<void>((r) => setTimeout(r, 150));
+        }
+
+        const response = await fetch(targetUrl, { signal: abortController.signal });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const html = await response.text();
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        const newList = doc.getElementById('home-article-list');
+        if (!newList) throw new Error('#home-article-list not found in fetched page');
+
+        // 替换列表内容（innerHTML 安全：fetch 同源页面，内容为构建时生成的静态 HTML）
+        container.innerHTML = newList.innerHTML;
+        // 更新 data-page（供下次 popstate 判断）
+        container.dataset.page = newList.dataset.page;
+
+        // 同步更新文档标题
+        const newTitle = doc.querySelector('title');
+        if (newTitle && newTitle.textContent) {
+          document.title = newTitle.textContent;
+        }
+
+        // 淡入新列表
+        if (!reducedMotion) {
+          container.style.opacity = '1';
+        }
+
+        // 滚动处理
+        if (options.scrollTo === 'restore' && options.restoreY != null) {
+          window.scrollTo(0, options.restoreY);
+        } else {
+          scrollToLatest();
+        }
+      } catch (e) {
+        // AbortError：被新的 fetch 取消，静默忽略
+        if (e instanceof DOMException && e.name === 'AbortError') return;
+        // 其他错误：回退为整页跳转（渐进增强保障）
+        window.location.href = targetUrl;
+      }
+    }
+
+    // ─── 事件委托：拦截分页链接点击 ───────────────────
+    container.addEventListener('click', async (e: MouseEvent) => {
+      const target = e.target;
+      const link =
+        target instanceof HTMLElement
+          ? (target.closest('a.pagination__link') as HTMLAnchorElement | null)
+          : null;
+      if (!link) return;
+      // 禁用状态（首页无上一页 / 末页无下一页）或当前页：不拦截
+      if (link.getAttribute('aria-disabled') === 'true') return;
+      if (link.classList.contains('pagination__link--current')) return;
+
+      e.preventDefault();
+      const targetUrl = cleanUrl(link.href);
+
+      // 保存当前滚动位置（供后退时恢复）
+      saveScrollState();
+
+      // 推入新历史条目
+      history.pushState({ homePagination: true, scrollY: 0 }, '', targetUrl);
+
+      // 局部替换列表
+      await fetchAndSwap(targetUrl, { scrollTo: 'latest' });
+    });
+
+    // ─── popstate：浏览器前进/后退 ───────────────────
+    window.addEventListener('popstate', () => {
+      const url = window.location.pathname + window.location.search;
+      const expectedPage = getPageFromUrl(url);
+      const currentPage = parseInt(container.dataset.page || '1', 10);
+
+      // DOM 页码与 URL 页码不一致 → 需要局部 swap
+      // 一致 → bfcache 恢复或新页面加载，DOM 已正确，跳过
+      if (expectedPage !== currentPage) {
+        const state = history.state;
+        const restoreY =
+          state && typeof state.scrollY === 'number' ? state.scrollY : 0;
+        fetchAndSwap(url, { scrollTo: 'restore', restoreY });
+      }
+    });
+
+    // ─── 初始化：保存初始滚动位置 ───────────────────
+    // 使用 requestAnimationFrame 确保布局完成后获取正确 scrollY
+    requestAnimationFrame(() => {
+      saveScrollState();
+    });
+  }
+</script>
+
+<style>
+  /* ─── Hero ───────────────────────────────────── */
+  .home-hero {
+    position: relative;
+    width: 100%;
+    /* 桌面端占满首屏（100vh）：最新文章需下滑才能看到 */
+    min-height: 100vh;
+    /* 将 Hero 上移至页面最顶端，覆盖 Header 的流式占位空间。
+     * Header 为 position:sticky; z-index:100，渲染在 Hero 之上，
+     * 透明 Header 即可透出粒子背景。 */
+    margin-top: calc(-1 * var(--height-header, 4rem));
+    /* 透明背景：让粒子背景层（position:fixed; z-index:-1）透出。 */
+    background-color: transparent;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+  }
+
+  .home-hero__inner {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: var(--width-content, 72rem);
+    margin-inline: auto;
+    padding-inline: var(--space-xl, 2rem);
+    /* 上大下小：让 Hero 文案整体略微下移，留出更多顶部呼吸空间 */
+    padding-block: 6rem var(--space-3xl, 4rem);
+    /* 左右两栏布局：左侧文字 52%，右侧 Science Map 48% */
+    display: grid;
+    grid-template-columns: 52% 48%;
+    align-items: center;
+    gap: var(--space-2xl, 3rem);
+  }
+
+  /* 左侧：标题 + 简介 + 按钮 */
+  .home-hero__left {
+    max-width: 30rem;
+  }
+
+  /* 右侧：Science Map 容器 */
+  .home-hero__right {
+    width: 100%;
+    height: 380px;
+    /* 限制最大尺寸，避免过大抢占标题空间 */
+    max-width: 480px;
+    max-height: 400px;
+    margin-inline: auto;
+    position: relative;
+  }
+
+  /* 主标题：得意黑（Smiley Sans），两行设计感排版
+   * 第一行"看见科学的"深灰紫，第二行"下一步。"品牌紫
+   * font-display: swap 确保加载前回退系统粗体 */
+  .home-hero__title {
+    font-family: 'Smiley Sans Oblique', var(--font-display);
+    font-size: clamp(2.75rem, 6vw, 4.25rem); /* 44px ~ 68px */
+    font-weight: var(--fw-bold, 700);
+    line-height: 1.05; /* 紧凑行距，两行标题贴合 */
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .home-hero__title-line {
+    display: block;
+  }
+
+  /* 第一行：深灰紫色 */
+  .home-hero__title-line--1 {
+    color: #2b2640;
+  }
+
+  /* 第二行：品牌紫色，略大 */
+  .home-hero__title-line--2 {
+    color: var(--color-brand, #6d4aff);
+    font-size: 1.08em; /* 略放大，视觉强调 */
+  }
+
+  /* 简介：灰紫色，保证浅紫背景上的可读性 */
+  .home-hero__desc {
+    margin-top: var(--space-xl, 2rem);
+    font-size: var(--fs-base, 1rem);
+    line-height: var(--lh-normal, 1.6);
+    color: #4a4660;
+    max-width: 28rem;
+  }
+
+  .home-hero__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-md, 1rem);
+    margin-top: var(--space-2xl, 3rem);
+  }
+
+  /* 入口按钮 */
+  .home-hero__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-sm, 0.75rem) var(--space-xl, 2rem);
+    border-radius: var(--radius-pill, 999px);
+    font-size: var(--fs-base, 1rem);
+    font-weight: var(--fw-semibold, 600);
+    text-decoration: none;
+    transition:
+      background-color var(--transition-fast, 150ms),
+      color var(--transition-fast, 150ms),
+      transform var(--transition-fast, 150ms);
+  }
+
+  /* 主按钮：品牌紫实底白字 */
+  .home-hero__btn--primary {
+    background-color: var(--color-brand, #6d4aff);
+    color: #ffffff;
+    box-shadow: 0 4px 14px rgba(109, 74, 255, 0.4);
+  }
+
+  .home-hero__btn--primary:hover {
+    background-color: var(--color-brand-strong, #5a36f0);
+    color: #ffffff;
+    transform: translateY(-1px);
+  }
+
+  /* 次按钮：透明描边深色字（适配浅紫背景） */
+  .home-hero__btn--ghost {
+    background-color: rgba(255, 255, 255, 0.35);
+    color: #2b2640;
+    border: 1px solid rgba(91, 6, 147, 0.35);
+    backdrop-filter: blur(4px);
+  }
+
+  .home-hero__btn--ghost:hover {
+    background-color: rgba(255, 255, 255, 0.55);
+    color: #2b2640;
+    border-color: rgba(91, 6, 147, 0.6);
+  }
+
+  /* 首页 body 背景：浅紫白（#e8e8fd），与粒子背景配置一致。 */
+  :global(body) {
+    background-color: #e8e8fd;
+  }
+
+  /* 平滑滚动：点击"浏览最新文章"平滑定位到文章区 */
+  :global(html) {
+    scroll-behavior: smooth;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :global(html) {
+      scroll-behavior: auto;
+    }
+    .home-hero__btn {
+      transition: none;
+    }
+  }
+
+  /* ─── 最新文章区 ─────────────────────────────── */
+  .home-latest {
+    padding-block: var(--space-3xl, 4rem) var(--space-2xl, 3rem);
+    background-color: transparent;
+  }
+
+  /* 首页 Footer：去除默认 margin-top，透明背景无边框 */
+  :global(.main + .footer) {
+    margin-top: 0;
+    background-color: transparent;
+    border-top-color: transparent;
+  }
+
+  .home-latest__inner {
+    max-width: 53.125rem; /* 850px */
+    margin-inline: auto;
+    padding-inline: var(--space-lg, 1.5rem);
+  }
+
+  .home-latest__title {
+    font-size: var(--fs-lg, 1.375rem);
+    font-weight: var(--fw-semibold, 600);
+    color: var(--color-heading, #2b2640);
+    padding-bottom: var(--space-sm, 0.75rem);
+    border-bottom: 2px solid var(--color-brand-border, #d9ccff);
+    margin-bottom: var(--space-md, 1rem);
+  }
+
+  /* ─── 客户端分页列表容器 ─────────────────────── */
+  /* 淡入淡出过渡：JS 切换 opacity 实现列表切换动画 */
+  #home-article-list {
+    transition: opacity 150ms ease;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    #home-article-list {
+      transition: none;
+    }
+  }
+
+  /* 平板端：缩小 Science Map，保持左右布局 */
+  @media (max-width: 1024px) {
+    .home-hero__inner {
+      gap: var(--space-xl, 2rem);
+    }
+
+    .home-hero__right {
+      height: 320px;
+      max-width: 400px;
+    }
+  }
+
+  /* 响应式：移动端改为上下布局，Science Map 在文字下方 */
+  @media (max-width: 768px) {
+    .home-hero {
+      min-height: auto;
+      margin-top: calc(-1 * var(--height-header-mobile, 3.5rem));
+      padding-block: var(--space-2xl, 3rem) var(--space-xl, 2rem);
+    }
+
+    .home-hero__inner {
+      grid-template-columns: 1fr; /* 单列上下布局 */
+      padding-inline: var(--space-md, 1rem);
+      padding-block: var(--space-2xl, 3rem);
+      gap: var(--space-xl, 2rem);
+    }
+
+    .home-hero__left {
+      max-width: 100%;
+    }
+
+    .home-hero__right {
+      height: 280px;
+      max-width: 340px;
+      order: 2; /* 确保在文字下方 */
+    }
+
+    .home-hero__title {
+      font-size: clamp(2.25rem, 8vw, 3rem);
+    }
+
+    .home-hero__actions {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .home-hero__btn {
+      width: 100%;
+    }
+
+    .home-latest__inner {
+      padding-inline: var(--space-md, 1rem);
+    }
+  }
+</style>

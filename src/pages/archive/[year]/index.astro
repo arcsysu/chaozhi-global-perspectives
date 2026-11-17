@@ -8,9 +8,11 @@
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import Container from '@/components/Container.astro';
 import ArticleList from '@/components/ArticleList.astro';
+import Pagination from '@/components/Pagination.astro';
 import '@/styles/page.css';
 import { getArchiveTree, getArticlesByYear } from '@/utils/articles';
 import { withBase } from '@/utils/site';
+import { paginate } from '@/utils/pagination';
 
 export async function getStaticPaths() {
   const tree = await getArchiveTree();
@@ -25,7 +27,8 @@ interface Props {
 }
 
 const { year } = Astro.props;
-const articles = await getArticlesByYear(year);
+const allArticles = await getArticlesByYear(year);
+const page1 = paginate(allArticles, 1);
 ---
 
 <BaseLayout title={`${year} 年归档`}>
@@ -38,12 +41,19 @@ const articles = await getArticlesByYear(year);
       </nav>
       <h1 class="page-header__title">{year} 年</h1>
       <p class="page-header__subtitle">
-        共 {articles.length} 篇文章，按发布时间倒序排列。
+        共 {allArticles.length} 篇文章，按发布时间倒序排列。
       </p>
     </section>
 
-    <section class="stack" aria-label={`${year}年文章`}>
-      <ArticleList articles={articles} showTags={true} emptyText="该年份暂无文章" />
+    <section class="stack" id="latest-articles" aria-label={`${year}年文章`}>
+      <ArticleList articles={page1.items} showTags={true} emptyText="该年份暂无文章" />
+      <Pagination
+        basePath={`/archive/${year}/`}
+        current={page1.page}
+        pages={page1.pages}
+        total={page1.total}
+        anchor="#latest-articles"
+      />
     </section>
   </Container>
 </BaseLayout>

@@ -108,8 +108,9 @@ const tocHeadings = headings.filter((h) => h.depth === 2 || h.depth === 3);
     padding-top: var(--space-md);
   }
 
+  /* 文章目录字号，可手动调整 */
   .article-toc__title {
-    font-size: var(--fs-xs);
+    font-size: 13px; /* 目录标题，原 12px(var(--fs-xs)) → 13px */
     font-weight: var(--fw-semibold);
     color: var(--color-text-muted);
     text-transform: uppercase;
@@ -135,13 +136,18 @@ const tocHeadings = headings.filter((h) => h.depth === 2 || h.depth === 3);
   .article-toc__link {
     display: block;
     padding: var(--space-2xs) var(--space-sm);
-    font-size: var(--fs-xs);
+    font-size: 14px; /* 目录条目(h2)，原 12px(var(--fs-xs)) → 14px */
     line-height: var(--lh-normal);
     color: var(--color-text-muted);
     text-decoration: none;
     border-left: 2px solid transparent;
     margin-left: -2px;
     transition: color var(--transition-fast);
+  }
+
+  /* h3 子条目略小于 h2，保持层级区分 */
+  .article-toc__item--h3 .article-toc__link {
+    font-size: 13px; /* 目录子条目(h3)，比 h2 小 1px */
   }
 
   .article-toc__link:hover {

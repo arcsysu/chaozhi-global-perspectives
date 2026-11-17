@@ -140,8 +140,8 @@
   /* 文章阅读区宽度（预留，三栏布局使用） */
   --width-article: 48rem; /* 768px */
   /* 导航栏高度 */
-  --height-header: 4rem; /* 64px 桌面 */
-  --height-header-mobile: 3.5rem; /* 56px 移动 */
+  --height-header: 4.5rem; /* 72px 桌面 */
+  --height-header-mobile: 4rem; /* 64px 移动 */
 
   /* ============================================================
    * 9. 圆角与阴影（克制使用）

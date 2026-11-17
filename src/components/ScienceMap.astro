@@ -1,0 +1,500 @@
+---
+/**
+ * ScienceMap.astro — 首页 Hero 右侧动态科学图谱
+ *
+ * 三个节点（HPC / AI / Science）围绕共同中心进行缓慢、连续的三维投影运动，
+ * 三条连线实时跟随节点形成持续变化的三角形。
+ *
+ * 视觉规范：
+ * - 节点：8px 紫色圆点，三节点大小完全一致
+ * - 连线：低透明度灰紫色细线（1.2px），可极小幅度弯曲
+ * - 文字：节点右上方，水平不旋转，固定偏移 (x=+17, y=-15)
+ * - 无大圆背景/玻璃球/芯片图标/轨道/辅助节点
+ *
+ * 动画原理（全部由连续函数计算，无随机/跳变）：
+ * - 三个节点在 3D 空间中分布在不同角度，围绕 Y 轴持续旋转
+ * - 旋转平面随时间缓慢倾斜（X 轴摇摆）
+ * - 节点轨道半径轻微正弦变化
+ * - 通过透视投影将 3D 坐标映射到 2D 屏幕坐标
+ * - 连线为二次贝塞尔曲线，控制点轻微偏移产生微弯效果
+ *
+ * 可调参数集中在 CONFIG 常量（见 <script> 内），方便后续微调。
+ *
+ * 性能：
+ * - prefers-reduced-motion：渲染静态三角形，不启动动画循环
+ * - 页面不可见（visibilitychange）时暂停 rAF
+ * - 组件卸载时清理 rAF 和事件监听器
+ * - 与 tsParticles 背景互不干扰（独立 SVG，pointer-events 仅在节点命中区）
+ */
+
+/**
+ * 节点数据定义。
+ * angle: 初始角度（弧度），三个节点均匀分布 120°
+ * label: 英文标签
+ * title: 中文全称（悬停说明标题）
+ * desc: 悬停说明描述
+ */
+const NODES = [
+  {
+    id: 'hpc',
+    label: 'HPC',
+    title: 'HPC · 高性能计算',
+    desc: '支撑科学模拟、数据处理与智能计算的算力基础。',
+    angle: -Math.PI / 2, // 顶部
+  },
+  {
+    id: 'ai',
+    label: 'AI',
+    title: 'AI · 科学智能',
+    desc: '运用智能算法与模型，探索新的科学研究方法。',
+    angle: -Math.PI / 2 + (2 * Math.PI) / 3, // 右下
+  },
+  {
+    id: 'science',
+    label: 'Science',
+    title: 'Science · 科学研究',
+    desc: '连接科学问题、计算方法与新的研究发现。',
+    angle: -Math.PI / 2 + (4 * Math.PI) / 3, // 左下
+  },
+] as const;
+---
+
+<div class="science-map" aria-label="科学图谱：HPC、AI 与 Science 的动态关系">
+  <svg
+    class="science-map__svg"
+    viewBox="-200 -160 400 320"
+    preserveAspectRatio="xMidYMid meet"
+    role="img"
+    aria-label="HPC、AI 与 Science 三节点动态关系图"
+  >
+    {/* 连线层：三条二次贝塞尔曲线，JS 实时更新 d 属性 */}
+    <g class="science-map__links" fill="none" stroke-linecap="round">
+      <path id="sm-link-0-1" class="science-map__link" d="" />
+      <path id="sm-link-1-2" class="science-map__link" d="" />
+      <path id="sm-link-2-0" class="science-map__link" d="" />
+    </g>
+
+    {/* 节点层：每个节点为一个 <g>，JS 每帧只更新 translate(x, y) */}
+    <g class="science-map__nodes">
+      {NODES.map((node, i) => (
+        <g id={`sm-node-${i}`} class="science-map__node" tabindex="0" role="button" aria-label={node.title}>
+          {/* 悬停光晕（默认隐藏，hover/focus 时显示） */}
+          <circle class="science-map__halo" cx="0" cy="0" r="18" />
+          {/* 命中区域：透明，扩大点击/悬停范围（半径 28），不影响视觉 */}
+          <circle class="science-map__hit" cx="0" cy="0" r="28" fill="transparent" />
+          {/* 节点圆点：固定 4px 半径 = 8px 直径 */}
+          <circle class="science-map__dot" cx="0" cy="0" r="4" />
+          {/* 文字标签：固定相对偏移，水平不旋转 */}
+          <text class="science-map__label" x="17" y="-15" text-anchor="start">
+            {node.label}
+          </text>
+        </g>
+      ))}
+    </g>
+  </svg>
+
+  {/* 悬停说明面板（默认隐藏，hover/focus 时显示对应内容） */}
+  <div class="science-map__tooltip" id="sm-tooltip" hidden>
+    <strong class="science-map__tooltip-title"></strong>
+    <p class="science-map__tooltip-desc"></p>
+  </div>
+</div>
+
+<style>
+  /* ─── 容器 ─────────────────────────────────── */
+  .science-map {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .science-map__svg {
+    width: 100%;
+    height: 100%;
+    overflow: visible; /* 允许节点光晕略微超出 viewBox */
+  }
+
+  /* ─── 连线 ─────────────────────────────────── */
+  .science-map__link {
+    stroke: rgba(91, 6, 147, 0.22);
+    stroke-width: 1.2;
+    transition: stroke 300ms ease, stroke-width 300ms ease, stroke-opacity 300ms ease;
+  }
+
+  /* 悬停时连线高亮（通过 JS 在 <g> 上添加 .is-active 类触发） */
+  .science-map__links.is-active .science-map__link {
+    stroke: rgba(109, 74, 255, 0.5);
+    stroke-width: 1.6;
+  }
+
+  /* ─── 节点 ─────────────────────────────────── */
+  .science-map__dot {
+    fill: #6d4aff;
+    transition: r 300ms ease, fill 300ms ease;
+  }
+
+  /* 光晕：默认透明，hover/focus 时淡入 */
+  .science-map__halo {
+    fill: rgba(109, 74, 255, 0);
+    transition: fill 300ms ease;
+  }
+
+  .science-map__node:hover .science-map__halo,
+  .science-map__node:focus-visible .science-map__halo {
+    fill: rgba(109, 74, 255, 0.18);
+  }
+
+  .science-map__node:hover .science-map__dot,
+  .science-map__node:focus-visible .science-map__dot {
+    fill: #5a36f0;
+  }
+
+  /* 文字标签：始终水平，固定偏移 */
+  .science-map__label {
+    font-family: var(--font-sans, sans-serif);
+    font-size: 13px;
+    font-weight: 600;
+    fill: #4a4660;
+    user-select: none;
+    pointer-events: none;
+    transition: fill 300ms ease;
+  }
+
+  .science-map__node:hover .science-map__label,
+  .science-map__node:focus-visible .science-map__label {
+    fill: #2b2640;
+  }
+
+  /* 键盘焦点环 */
+  .science-map__node:focus-visible .science-map__hit {
+    outline: none;
+  }
+
+  .science-map__node:focus-visible {
+    outline: none;
+  }
+
+  .science-map__node:focus-visible .science-map__halo {
+    fill: rgba(109, 74, 255, 0.22);
+  }
+
+  /* 命中区域：不显示轮廓但可聚焦 */
+  .science-map__hit {
+    outline: none;
+    cursor: pointer;
+  }
+
+  /* ─── 悬停说明面板 ─────────────────────────── */
+  .science-map__tooltip {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    max-width: 280px;
+    padding: 0.625rem 1rem;
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--color-brand-border, #d9ccff);
+    border-radius: var(--radius-md, 8px);
+    text-align: center;
+    pointer-events: none;
+    transition: opacity 250ms ease;
+    z-index: 2;
+  }
+
+  .science-map__tooltip[hidden] {
+    opacity: 0;
+    display: block; /* 保持 transition 生效，hidden 仅控制可见性 */
+  }
+
+  .science-map__tooltip-title {
+    display: block;
+    font-size: var(--fs-sm, 0.875rem);
+    font-weight: 600;
+    color: var(--color-heading, #2b2640);
+    margin-bottom: 0.25rem;
+  }
+
+  .science-map__tooltip-desc {
+    margin: 0;
+    font-size: var(--fs-xs, 0.75rem);
+    line-height: 1.5;
+    color: var(--color-text-muted, #767289);
+  }
+
+  /* ─── reduced-motion：静态图样式不变，动画由 JS 控制 ─── */
+  @media (prefers-reduced-motion: reduce) {
+    .science-map__link,
+    .science-map__dot,
+    .science-map__halo,
+    .science-map__label {
+      transition: none;
+    }
+  }
+</style>
+
+<script>
+  /**
+   * Science Map 动画引擎
+   *
+   * 可调参数集中在此处，方便后续手动微调：
+   * - ROTATE_SPEED: 旋转速度（弧度/秒），约 0.15 = 每 ~42 秒一圈
+   * - TILT_SPEED: 平面倾斜速度（弧度/秒），约 0.08 = 每 ~79 秒一周期
+   * - TILT_AMP: 倾斜幅度（弧度），0.45 ≈ 26°
+   * - RADIUS_BASE: 基础轨道半径（SVG 单位）
+   * - RADIUS_AMP: 半径变化幅度（SVG 单位）
+   * - RADIUS_SPEED: 半径变化速度
+   * - PERSPECTIVE: 透视距离（越大越接近正交投影）
+   * - CURVE_OFFSET: 连线弯曲偏移（二次贝塞尔控制点偏移量）
+   */
+  const CONFIG = {
+    ROTATE_SPEED: 0.15,    // 旋转角速度（rad/s）
+    TILT_SPEED: 0.08,      // 倾斜变化速度（rad/s）
+    TILT_AMP: 0.45,        // 倾斜幅度（rad，~26°）
+    RADIUS_BASE: 160,      // 基础轨道半径（投影宽约占右侧容器 55%-75%）
+    RADIUS_AMP: 22,        // 半径变化幅度
+    RADIUS_SPEED: 0.12,    // 半径变化速度
+    PERSPECTIVE: 420,      // 透视距离
+    CURVE_OFFSET: 8,       // 连线弯曲偏移
+    HOVER_SLOWDOWN: 0.25,  // 悬停时旋转减速到 25%
+    DOT_RADIUS: 4,         // 节点圆点半径（8px 直径）
+    HALO_RADIUS: 18,       // 光晕半径
+    HIT_RADIUS: 28,        // 命中区域半径
+  };
+
+  // 节点初始角度（与上方 Astro NODES 定义一致）
+  const NODE_ANGLES = [-Math.PI / 2, -Math.PI / 2 + (2 * Math.PI) / 3, -Math.PI / 2 + (4 * Math.PI) / 3];
+
+  // 节点说明数据（与上方 Astro NODES 定义一致）
+  const NODE_INFO = [
+    { title: 'HPC · 高性能计算', desc: '支撑科学模拟、数据处理与智能计算的算力基础。' },
+    { title: 'AI · 科学智能', desc: '运用智能算法与模型，探索新的科学研究方法。' },
+    { title: 'Science · 科学研究', desc: '连接科学问题、计算方法与新的研究发现。' },
+  ];
+
+  /** 3D 点投影到 2D 屏幕 */
+  function project3D(x: number, y: number, z: number, persp: number): { x: number; y: number; scale: number } {
+    const denom = persp + z;
+    const scale = denom > 0 ? persp / denom : 1;
+    return { x: x * scale, y: y * scale, scale };
+  }
+
+  /** 计算某节点在某时刻的 2D 投影坐标 */
+  function getNodePosition(i: number, t: number): { x: number; y: number; scale: number; z: number } {
+    const angle = NODE_ANGLES[i] + t * CONFIG.ROTATE_SPEED;
+    // 半径轻微正弦变化
+    const r = CONFIG.RADIUS_BASE + Math.sin(t * CONFIG.RADIUS_SPEED + i * 1.7) * CONFIG.RADIUS_AMP;
+
+    // 3D 坐标：先在 XZ 平面布局（旋转），再施加 X 轴倾斜
+    let x3 = Math.cos(angle) * r;
+    let z3 = Math.sin(angle) * r;
+    let y3 = 0;
+
+    // X 轴倾斜：绕 X 轴旋转，y 和 z 混合
+    const tilt = Math.sin(t * CONFIG.TILT_SPEED) * CONFIG.TILT_AMP;
+    const cosT = Math.cos(tilt);
+    const sinT = Math.sin(tilt);
+    const yNew = y3 * cosT - z3 * sinT;
+    const zNew = y3 * sinT + z3 * cosT;
+    y3 = yNew;
+    z3 = zNew;
+
+    const proj = project3D(x3, y3, z3, CONFIG.PERSPECTIVE);
+    return { x: proj.x, y: proj.y, scale: proj.scale, z: z3 };
+  }
+
+  /** 计算两节点间连线的二次贝塞尔路径（带轻微弯曲） */
+  function getLinkPath(p1: { x: number; y: number }, p2: { x: number; y: number }, t: number, linkIdx: number): string {
+    const mx = (p1.x + p2.x) / 2;
+    const my = (p1.y + p2.y) / 2;
+    // 控制点轻微偏移：垂直于连线方向，幅度随时间正弦变化
+    const dx = p2.x - p1.x;
+    const dy = p2.y - p1.y;
+    const len = Math.sqrt(dx * dx + dy * dy) || 1;
+    // 垂直方向单位向量
+    const nx = -dy / len;
+    const ny = dx / len;
+    const offset = Math.sin(t * 0.3 + linkIdx * 2.1) * CONFIG.CURVE_OFFSET;
+    const cx = mx + nx * offset;
+    const cy = my + ny * offset;
+    return `M ${p1.x.toFixed(2)} ${p1.y.toFixed(2)} Q ${cx.toFixed(2)} ${cy.toFixed(2)} ${p2.x.toFixed(2)} ${p2.y.toFixed(2)}`;
+  }
+
+  /** 主初始化 */
+  function initScienceMap() {
+    const svg = document.querySelector<SVGSVGElement>('.science-map__svg');
+    if (!svg) return;
+
+    const nodeEls: SVGGElement[] = [];
+    const dotEls: SVGCircleElement[] = [];
+    for (let i = 0; i < 3; i++) {
+      const g = document.getElementById(`sm-node-${i}`);
+      if (g instanceof SVGGElement) {
+        nodeEls.push(g);
+        const dot = g.querySelector('.science-map__dot');
+        if (dot instanceof SVGCircleElement) dotEls.push(dot);
+      }
+    }
+
+    const linkEls: SVGPathElement[] = [
+      document.querySelector<SVGPathElement>('#sm-link-0-1'),
+      document.querySelector<SVGPathElement>('#sm-link-1-2'),
+      document.querySelector<SVGPathElement>('#sm-link-2-0'),
+    ].filter((el): el is SVGPathElement => el !== null);
+
+    const linksGroup = document.querySelector<SVGGElement>('.science-map__links');
+    const tooltip = document.getElementById('sm-tooltip');
+    const tooltipTitle = tooltip?.querySelector('.science-map__tooltip-title');
+    const tooltipDesc = tooltip?.querySelector('.science-map__tooltip-desc');
+
+    if (nodeEls.length !== 3 || linkEls.length !== 3) return;
+
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    let hoveredNode = -1;
+    let speedMultiplier = 1;
+
+    // ─── 悬停/焦点交互 ──────────────────────────
+    function showTooltip(idx: number) {
+      if (!tooltip || !tooltipTitle || !tooltipDesc) return;
+      tooltipTitle.textContent = NODE_INFO[idx].title;
+      tooltipDesc.textContent = NODE_INFO[idx].desc;
+      tooltip.hidden = false;
+      if (linksGroup) linksGroup.classList.add('is-active');
+    }
+
+    function hideTooltip() {
+      if (!tooltip) return;
+      tooltip.hidden = true;
+      if (linksGroup) linksGroup.classList.remove('is-active');
+    }
+
+    nodeEls.forEach((g, i) => {
+      g.addEventListener('mouseenter', () => {
+        hoveredNode = i;
+        speedMultiplier = CONFIG.HOVER_SLOWDOWN;
+        showTooltip(i);
+      });
+      g.addEventListener('mouseleave', () => {
+        hoveredNode = -1;
+        speedMultiplier = 1;
+        hideTooltip();
+      });
+      g.addEventListener('focus', () => {
+        speedMultiplier = CONFIG.HOVER_SLOWDOWN;
+        showTooltip(i);
+      });
+      g.addEventListener('blur', () => {
+        speedMultiplier = 1;
+        hideTooltip();
+      });
+      // 键盘 Enter/Space 触发说明
+      g.addEventListener('keydown', (e: KeyboardEvent) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          showTooltip(i);
+        }
+      });
+      // 移动端点击切换说明
+      g.addEventListener('click', (e: Event) => {
+        e.preventDefault();
+        if (hoveredNode === i) {
+          hoveredNode = -1;
+          speedMultiplier = 1;
+          hideTooltip();
+        } else {
+          hoveredNode = i;
+          speedMultiplier = CONFIG.HOVER_SLOWDOWN;
+          showTooltip(i);
+        }
+      });
+    });
+
+    // ─── 渲染单帧 ──────────────────────────────
+    function renderFrame(t: number) {
+      const positions = [0, 1, 2].map((i) => getNodePosition(i, t));
+
+      // 更新节点位置和缩放
+      for (let i = 0; i < 3; i++) {
+        const pos = positions[i];
+        const g = nodeEls[i];
+        g.setAttribute('transform', `translate(${pos.x.toFixed(2)}, ${pos.y.toFixed(2)})`);
+
+        // 根据深度（z）微调节点大小：近大远小，但幅度很小，保持视觉一致
+        const dot = dotEls[i];
+        if (dot) {
+          const r = CONFIG.DOT_RADIUS * (0.85 + pos.scale * 0.15);
+          dot.setAttribute('r', r.toFixed(2));
+          // 根据深度调整透明度：远的略淡
+          const opacity = 0.7 + pos.scale * 0.3;
+          dot.style.opacity = opacity.toFixed(2);
+        }
+      }
+
+      // 更新连线
+      const linkPairs = [[0, 1], [1, 2], [2, 0]];
+      for (let li = 0; li < 3; li++) {
+        const [a, b] = linkPairs[li];
+        linkEls[li].setAttribute('d', getLinkPath(positions[a], positions[b], t, li));
+      }
+    }
+
+    // ─── reduced-motion：渲染静态帧，不启动循环 ───
+    if (reducedMotion) {
+      renderFrame(0);
+      return;
+    }
+
+    // ─── 动画循环 ──────────────────────────────
+    const startTime = performance.now();
+    let elapsed = 0;
+    let lastTimestamp = startTime;
+    let rafId: number | null = null;
+    let isPaused = false;
+
+    function animate(timestamp: number) {
+      if (isPaused) {
+        rafId = requestAnimationFrame(animate);
+        return;
+      }
+      const dt = (timestamp - lastTimestamp) / 1000;
+      lastTimestamp = timestamp;
+      elapsed += dt * speedMultiplier;
+
+      renderFrame(elapsed);
+
+      rafId = requestAnimationFrame(animate);
+    }
+
+    rafId = requestAnimationFrame(animate);
+
+    // ─── 页面可见性：隐藏时暂停 ──────────────────
+    function handleVisibility() {
+      if (document.hidden) {
+        isPaused = true;
+      } else {
+        isPaused = false;
+        lastTimestamp = performance.now(); // 重置时间，避免跳变
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    // ─── 清理：组件卸载时移除 rAF 和事件 ────────
+    // Astro 客户端导航时不触发，但静态页面刷新/关闭时浏览器自动回收。
+    // 此清理主要防止 SPA 式场景中的重复初始化。
+    window.addEventListener('pagehide', () => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    }, { once: true });
+  }
+
+  // 初始化：DOM 就绪后执行
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initScienceMap, { once: true });
+  } else {
+    initScienceMap();
+  }
+</script>

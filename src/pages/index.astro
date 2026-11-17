@@ -1,54 +1,16 @@
 ---
 /**
- * 首页 (/)
+ * 首页 (/) — 分页第一页
  *
- * 展示已发布文章列表，按发布时间倒序。
- * 单列线性排列，每篇展示标题、摘要、来源时间和可选左侧缩略图。
- * 首页不显示文章标签。
+ * 使用 HomeLayout 渲染完整首页结构（Hero + 粒子背景 + 最新文章列表）。
+ * 第 2 页及之后由 /page/[page]/index.astro 渲染，同样使用 HomeLayout，
+ * 确保直接访问 /page/N/ 时也是完整首页。
  *
- * 开发环境额外展示 Demo 文章预览区（明确标记，生产构建不生成）。
+ * 客户端分页逻辑封装在 HomeLayout 的 <script> 中：
+ * 点击分页链接 → fetch 目标页 → 提取 #home-article-list 局部替换 →
+ * History API 更新 URL，不整页刷新。
  */
-import BaseLayout from '@/layouts/BaseLayout.astro';
-import Container from '@/components/Container.astro';
-import ArticleList from '@/components/ArticleList.astro';
-import '@/styles/page.css';
-import { site } from '@/utils/site';
-import { getMergedThumbnailedArticles } from '@/utils/articles';
-
-// 开发环境：published + Demo 合并统一列表（按时间倒序）
-// 生产环境：等价于 getThumbnailedArticles（Demo 自动隔离，不含内部资料）
-const articles = await getMergedThumbnailedArticles();
+import HomeLayout from '@/layouts/HomeLayout.astro';
 ---
 
-<BaseLayout title="首页" appendSiteName={false}>
-  <Container>
-    <!-- 首页 Hero：品牌名称 + 宣传语 + 定位说明 -->
-    <section class="page-hero">
-      <h1 class="page-hero__title">{site.name}</h1>
-      <p class="page-hero__slogan">{site.slogan}</p>
-      <p class="page-hero__desc">
-        {site.team} 团队围绕 {site.direction}
-        前沿观察计划建设的科技信息展示平台。持续追踪 HPC 与 AI for Science
-        领域的全球动态，呈现观察成果。
-      </p>
-    </section>
-
-    <!-- 最新文章：published + Demo 统一列表（按时间倒序） -->
-    <!-- 开发环境含 Demo 文章（带"演示"标记），生产环境仅含已审核文章 -->
-    <section class="stack" aria-label="最新文章">
-      <h2 class="section-title">最新文章</h2>
-      <ArticleList articles={articles} limit={20} />
-    </section>
-  </Container>
-</BaseLayout>
-
-<style>
-  .section-title {
-    font-size: var(--fs-lg);
-    font-weight: var(--fw-semibold);
-    color: var(--color-heading);
-    padding-bottom: var(--space-sm);
-    border-bottom: 2px solid var(--color-brand-border);
-    margin-bottom: var(--space-md);
-  }
-</style>
+<HomeLayout page={1} />

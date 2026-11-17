@@ -1,0 +1,37 @@
+---
+/**
+ * 首页分页列表页 (/page/[page]/) — 第 2 页及之后
+ *
+ * 使用 HomeLayout 渲染完整首页结构（Hero + 粒子背景 + 最新文章列表），
+ * 与首页（/）共用同一布局，仅 page 参数不同。
+ *
+ * 这样直接访问 /page/2/ 时也会显示完整首页（Hero + 粒子 + Header + Footer），
+ * 而非独立的文章列表页——满足"直接访问、刷新 /page/2/ 时应显示完整首页结构"的要求。
+ *
+ * 客户端分页时，JS fetch 本路由的 HTML，提取 #home-article-list 进行局部替换。
+ *
+ * 路由：
+ * - page 参数为页码字符串（从 2 开始，第一页由 / 处理）
+ * - getStaticPaths 仅生成文章总数超过 PER_PAGE 时所需的后续页码
+ */
+import HomeLayout from '@/layouts/HomeLayout.astro';
+import { getMergedThumbnailedArticles } from '@/utils/articles';
+import { getExtraPageNumbers } from '@/utils/pagination';
+
+export async function getStaticPaths() {
+  const allArticles = await getMergedThumbnailedArticles();
+  const pages = getExtraPageNumbers(allArticles.length);
+  return pages.map((page) => ({
+    params: { page: String(page) },
+    props: { page },
+  }));
+}
+
+interface Props {
+  page: number;
+}
+
+const { page } = Astro.props;
+---
+
+<HomeLayout page={page} />

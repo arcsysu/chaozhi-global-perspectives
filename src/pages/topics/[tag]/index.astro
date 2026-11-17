@@ -11,9 +11,11 @@
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import Container from '@/components/Container.astro';
 import ArticleList from '@/components/ArticleList.astro';
+import Pagination from '@/components/Pagination.astro';
 import '@/styles/page.css';
 import { getTagStats, getArticlesByTag } from '@/utils/articles';
 import { withBase } from '@/utils/site';
+import { paginate } from '@/utils/pagination';
 
 export async function getStaticPaths() {
   const tagStats = await getTagStats();
@@ -30,7 +32,8 @@ interface Props {
 }
 
 const { tag } = Astro.props;
-const articles = await getArticlesByTag(tag);
+const allArticles = await getArticlesByTag(tag);
+const page1 = paginate(allArticles, 1);
 ---
 
 <BaseLayout title={`主题：${tag}`}>
@@ -43,12 +46,19 @@ const articles = await getArticlesByTag(tag);
       </nav>
       <h1 class="page-header__title">{tag}</h1>
       <p class="page-header__subtitle">
-        共 {articles.length} 篇文章，按发布时间倒序排列。
+        共 {allArticles.length} 篇文章，按发布时间倒序排列。
       </p>
     </section>
 
-    <section class="stack" aria-label={`${tag} 主题文章`}>
-      <ArticleList articles={articles} showTags={false} emptyText="该主题暂无文章" />
+    <section class="stack" id="latest-articles" aria-label={`${tag} 主题文章`}>
+      <ArticleList articles={page1.items} showTags={false} emptyText="该主题暂无文章" />
+      <Pagination
+        basePath={`/topics/${encodeURIComponent(tag)}/`}
+        current={page1.page}
+        pages={page1.pages}
+        total={page1.total}
+        anchor="#latest-articles"
+      />
     </section>
   </Container>
 </BaseLayout>

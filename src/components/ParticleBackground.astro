@@ -1,0 +1,176 @@
+---
+/**
+ * ParticleBackground.astro
+ *
+ * 首页动态粒子背景（tsParticles Galaxy 模式）。
+ *
+ * 设计要点：
+ * - 固定于视口（position: fixed; inset: 0），不随页面滚动。
+ * - 覆盖整页（Hero + 最新文章列表 + Footer），作为最底层背景层。
+ * - 负 z-index：位于 body 背景色之上、所有 normal-flow 内容之下，
+ *   透出粒子但不拦截点击/滚动/选中（pointer-events: none）。
+ * - 单实例：全页只有一个 Canvas，避免重复初始化与内存泄漏。
+ * - 尊重 prefers-reduced-motion：动效降级为静止或低强度。
+ * - 页面隐藏（visibilitychange）时暂停动画，节省 CPU/电量。
+ * - 移动端降低粒子数量与移动速度，兼顾性能。
+ *
+ * 可调参数（见下方 CONFIG 常量）：
+ * - BG_COLOR：背景色（#e8e8fd 浅紫白）
+ * - PARTICLE_COLOR：粒子颜色（#5b0693 深紫）
+ * - PARTICLE_COUNT：粒子数量（桌面 50）
+ * - MOVE_SPEED：移动速度（1）
+ * - OPACITY：粒子不透明度（0.7）
+ *
+ * 依赖：tsParticles v2.12.0（CDN，与 Background Lab 附件一致）。
+ */
+---
+
+<!-- 粒子画布容器：fixed 覆盖整视口，负 z-index 作为背景层 -->
+<div id="particle-bg" aria-hidden="true">
+  <div id="tsparticles"></div>
+</div>
+
+<style>
+  /* 粒子背景层：固定于视口，覆盖整页，不随滚动移动 */
+  #particle-bg {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    /* 负 z-index：位于所有 normal-flow 内容之下，但仍高于 body 背景色。
+     * body 背景色 #e8e8fd 提供粒子间隙的底色。 */
+    z-index: -1;
+    /* 不拦截任何交互：点击/滚动/选中穿透到内容层 */
+    pointer-events: none;
+    /* 溢出隐藏：粒子小幅移出视口边缘时不产生滚动条 */
+    overflow: hidden;
+    /* 背景色：与粒子配置一致，作为粒子间隙底色（也防 CDN 未加载时白屏） */
+    background-color: #e8e8fd;
+  }
+
+  #tsparticles {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* 尊重 prefers-reduced-motion：隐藏粒子画布，仅保留纯色背景，
+   * 既避免动画干扰又保留页面底色一致性。 */
+  @media (prefers-reduced-motion: reduce) {
+    #tsparticles {
+      display: none;
+    }
+  }
+</style>
+
+<script>
+  // ─── 可调参数 ───────────────────────────────────────
+  // 修改此处即可调整背景色、粒子颜色、数量、速度、不透明度。
+  const CONFIG = {
+    BG_COLOR: '#e8e8fd',        // 背景色（浅紫白）
+    PARTICLE_COLOR: '#5b0693',  // 粒子颜色（深紫）
+    PARTICLE_COUNT: 50,         // 粒子数量（桌面）
+    MOVE_SPEED: 1,              // 移动速度
+    OPACITY: 0.7,               // 粒子不透明度
+  };
+
+  // 移动端：降低粒子数量与速度，减轻渲染负担
+  const isMobile = window.matchMedia('(max-width: 768px)').matches;
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // reduced-motion：不初始化粒子动画，仅保留 CSS 纯色背景
+  if (!reducedMotion) {
+    // 动态加载 tsParticles CDN（v2.12.0，与 Background Lab 附件一致）
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/tsparticles@2.12.0/tsparticles.bundle.min.js';
+    script.async = true;
+    script.onload = () => {
+      const tsparticles = (window as any).tsParticles;
+      if (!tsparticles) return;
+
+      // 防重复初始化：若已有同名 container，先 destroy 再重建
+      const existing = (tsparticles as any).dom()?.find((c: any) => c.id === 'tsparticles');
+      if (existing) {
+        existing.destroy?.();
+      }
+
+      const particleCount = isMobile
+        ? Math.round(CONFIG.PARTICLE_COUNT * 0.5) // 移动端减半
+        : CONFIG.PARTICLE_COUNT;
+      const moveSpeed = isMobile ? CONFIG.MOVE_SPEED * 0.7 : CONFIG.MOVE_SPEED;
+
+      tsparticles
+        .load({
+          id: 'tsparticles',
+          options: {
+            background: {
+              color: CONFIG.BG_COLOR,
+            },
+            fpsLimit: 60,
+            fullScreen: { enable: false }, // 由外层 #particle-bg fixed 控制定位
+            particles: {
+              number: {
+                value: particleCount,
+                density: {
+                  enable: true,
+                  area: 900,
+                },
+              },
+              color: {
+                value: CONFIG.PARTICLE_COLOR,
+              },
+              opacity: {
+                value: CONFIG.OPACITY,
+              },
+              size: {
+                value: { min: 1, max: 3 },
+              },
+              move: {
+                enable: true,
+                speed: moveSpeed,
+                direction: 'none',
+                random: true,
+                straight: false,
+                outModes: {
+                  default: 'out', // 粒子移出边界后消失（由 density 补充）
+                },
+              },
+              links: {
+                enable: false, // Galaxy 模式：不连线，纯星点
+              },
+              twinkle: {
+                particles: {
+                  enable: true,
+                  frequency: 0.05,
+                  opacity: 1,
+                },
+              },
+            },
+            detectRetina: true,
+          },
+        })
+        .then((instance: any) => {
+          if (!instance) return;
+
+          // 页面隐藏时暂停动画，可见时恢复，节省 CPU/电量
+          document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+              instance.pause();
+            } else {
+              instance.play();
+            }
+          });
+        })
+        .catch((err: unknown) => {
+          // 加载/初始化失败时静默降级为纯色背景（CSS 已提供 #e8e8fd 底色）
+          console.warn('[ParticleBackground] tsParticles init failed:', err);
+        });
+    };
+    script.onerror = () => {
+      // CDN 加载失败：静默降级，CSS 纯色背景已兜底
+      console.warn('[ParticleBackground] tsParticles CDN load failed, falling back to solid color.');
+    };
+    document.head.appendChild(script);
+  }
+</script>

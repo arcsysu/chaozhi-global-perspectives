@@ -1,0 +1,110 @@
+---
+/**
+ * 主题合集分页页 (/topics/[tag]/page/[page]/) — 第 2 页及之后
+ *
+ * 与主题合集首页（/topics/[tag]/）共享同一文章数据源与排序，
+ * 仅展示对应页的文章列表 + 分页导航。
+ *
+ * 路由：
+ * - tag 参数为主题名称（原始值，Astro 自动 URL 编码）
+ * - page 参数为页码字符串（从 2 开始，第一页由 /topics/[tag]/ 处理）
+ * - getStaticPaths 仅生成文章数超过 PER_PAGE 的标签的后续页码
+ *
+ * 设计：
+ * - 数据层切片：每页只渲染最多 PER_PAGE 篇文章
+ * - 面包屑回到主题首页，保持导航连续性
+ * - 分页链接带 #latest-articles 锚点，跳转后定位到列表顶部
+ * - 不引入客户端 JS，纯静态 <a href> 链接
+ */
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import Container from '@/components/Container.astro';
+import ArticleList from '@/components/ArticleList.astro';
+import Pagination from '@/components/Pagination.astro';
+import '@/styles/page.css';
+import { getTagStats, getArticlesByTag } from '@/utils/articles';
+import { withBase } from '@/utils/site';
+import { paginate, getExtraPageNumbers } from '@/utils/pagination';
+
+export async function getStaticPaths() {
+  const tagStats = await getTagStats();
+  const paths: Array<{
+    params: { tag: string; page: string };
+    props: { tag: string; page: number };
+  }> = [];
+  for (const { tag } of tagStats) {
+    const articles = await getArticlesByTag(tag);
+    const pages = getExtraPageNumbers(articles.length);
+    for (const page of pages) {
+      paths.push({
+        // 注意：传入原始 tag（未编码），Astro 会自动 URL 编码
+        params: { tag, page: String(page) },
+        props: { tag, page },
+      });
+    }
+  }
+  return paths;
+}
+
+interface Props {
+  tag: string;
+  page: number;
+}
+
+const { tag, page } = Astro.props;
+const allArticles = await getArticlesByTag(tag);
+const result = paginate(allArticles, page);
+---
+
+<BaseLayout title={`主题：${tag} · 第 ${page} 页`}>
+  <Container>
+    <section class="page-header">
+      <nav class="breadcrumb" aria-label="面包屑">
+        <a href={withBase('/topics/')}>主题</a>
+        <span aria-hidden="true">/</span>
+        <a href={withBase(`/topics/${encodeURIComponent(tag)}/`)}>{tag}</a>
+        <span aria-hidden="true">/</span>
+        <span class="breadcrumb__current">第 {page} 页</span>
+      </nav>
+      <h1 class="page-header__title">{tag}</h1>
+      <p class="page-header__subtitle">
+        第 {page} / {result.pages} 页，共 {result.total} 篇文章，按发布时间倒序。
+      </p>
+    </section>
+
+    <section class="stack" id="latest-articles" aria-label={`${tag} 主题文章`}>
+      <ArticleList articles={result.items} showTags={false} emptyText="该页暂无文章" />
+      <Pagination
+        basePath={`/topics/${encodeURIComponent(tag)}/`}
+        current={result.page}
+        pages={result.pages}
+        total={result.total}
+        anchor="#latest-articles"
+      />
+    </section>
+  </Container>
+</BaseLayout>
+
+<style>
+  .breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    font-size: var(--fs-sm);
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-sm);
+  }
+
+  .breadcrumb a {
+    color: var(--color-brand);
+    text-decoration: none;
+  }
+
+  .breadcrumb a:hover {
+    color: var(--color-brand-strong);
+  }
+
+  .breadcrumb__current {
+    color: var(--color-heading);
+    font-weight: var(--fw-medium);
+  }
+</style>

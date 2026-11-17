@@ -8,9 +8,11 @@
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import Container from '@/components/Container.astro';
 import ArticleList from '@/components/ArticleList.astro';
+import Pagination from '@/components/Pagination.astro';
 import '@/styles/page.css';
 import { getArchiveTree, getArticlesByYearMonth } from '@/utils/articles';
 import { withBase } from '@/utils/site';
+import { paginate } from '@/utils/pagination';
 
 const monthNames: Record<string, string> = {
   '01': '1月', '02': '2月', '03': '3月', '04': '4月',
@@ -41,8 +43,9 @@ interface Props {
 }
 
 const { year, month } = Astro.props;
-const articles = await getArticlesByYearMonth(year, month);
+const allArticles = await getArticlesByYearMonth(year, month);
 const monthLabel = monthNames[month] ?? `${month}月`;
+const page1 = paginate(allArticles, 1);
 ---
 
 <BaseLayout title={`${year}年${monthLabel}归档`}>
@@ -57,12 +60,19 @@ const monthLabel = monthNames[month] ?? `${month}月`;
       </nav>
       <h1 class="page-header__title">{year} 年 {monthLabel}</h1>
       <p class="page-header__subtitle">
-        共 {articles.length} 篇文章，按发布时间倒序排列。
+        共 {allArticles.length} 篇文章，按发布时间倒序排列。
       </p>
     </section>
 
-    <section class="stack" aria-label={`${year}年${monthLabel}文章`}>
-      <ArticleList articles={articles} showTags={true} emptyText="该月份暂无文章" />
+    <section class="stack" id="latest-articles" aria-label={`${year}年${monthLabel}文章`}>
+      <ArticleList articles={page1.items} showTags={true} emptyText="该月份暂无文章" />
+      <Pagination
+        basePath={`/archive/${year}/${month}/`}
+        current={page1.page}
+        pages={page1.pages}
+        total={page1.total}
+        anchor="#latest-articles"
+      />
     </section>
   </Container>
 </BaseLayout>

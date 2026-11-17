@@ -1,0 +1,103 @@
+---
+/**
+ * 年份合集分页页 (/archive/[year]/page/[page]/) — 第 2 页及之后
+ *
+ * 与年份合集首页（/archive/[year]/）共享同一文章数据源与排序，
+ * 仅展示对应页的文章列表 + 分页导航。
+ *
+ * 路由：
+ * - year 参数为年份字符串（数字，无需编码）
+ * - page 参数为页码字符串（从 2 开始，第一页由 /archive/[year]/ 处理）
+ * - getStaticPaths 仅生成文章数超过 PER_PAGE 的年份的后续页码
+ */
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import Container from '@/components/Container.astro';
+import ArticleList from '@/components/ArticleList.astro';
+import Pagination from '@/components/Pagination.astro';
+import '@/styles/page.css';
+import { getArchiveTree, getArticlesByYear } from '@/utils/articles';
+import { withBase } from '@/utils/site';
+import { paginate, getExtraPageNumbers } from '@/utils/pagination';
+
+export async function getStaticPaths() {
+  const tree = await getArchiveTree();
+  const paths: Array<{
+    params: { year: string; page: string };
+    props: { year: string; page: number };
+  }> = [];
+  for (const node of tree) {
+    const articles = await getArticlesByYear(node.year);
+    const pages = getExtraPageNumbers(articles.length);
+    for (const page of pages) {
+      paths.push({
+        params: { year: node.year, page: String(page) },
+        props: { year: node.year, page },
+      });
+    }
+  }
+  return paths;
+}
+
+interface Props {
+  year: string;
+  page: number;
+}
+
+const { year, page } = Astro.props;
+const allArticles = await getArticlesByYear(year);
+const result = paginate(allArticles, page);
+---
+
+<BaseLayout title={`${year} 年归档 · 第 ${page} 页`}>
+  <Container>
+    <section class="page-header">
+      <nav class="breadcrumb" aria-label="面包屑">
+        <a href={withBase('/archive/')}>时间树</a>
+        <span aria-hidden="true">/</span>
+        <a href={withBase(`/archive/${year}/`)}>{year} 年</a>
+        <span aria-hidden="true">/</span>
+        <span class="breadcrumb__current">第 {page} 页</span>
+      </nav>
+      <h1 class="page-header__title">{year} 年</h1>
+      <p class="page-header__subtitle">
+        第 {page} / {result.pages} 页，共 {result.total} 篇文章，按发布时间倒序。
+      </p>
+    </section>
+
+    <section class="stack" id="latest-articles" aria-label={`${year}年文章`}>
+      <ArticleList articles={result.items} showTags={true} emptyText="该页暂无文章" />
+      <Pagination
+        basePath={`/archive/${year}/`}
+        current={result.page}
+        pages={result.pages}
+        total={result.total}
+        anchor="#latest-articles"
+      />
+    </section>
+  </Container>
+</BaseLayout>
+
+<style>
+  .breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    font-size: var(--fs-sm);
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-sm);
+  }
+
+  .breadcrumb a {
+    color: var(--color-brand);
+    text-decoration: none;
+  }
+
+  .breadcrumb a:hover {
+    color: var(--color-brand-strong);
+  }
+
+  .breadcrumb__current {
+    color: var(--color-heading);
+    font-weight: var(--fw-medium);
+  }
+</style>

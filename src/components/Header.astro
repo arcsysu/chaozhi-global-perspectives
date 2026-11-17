@@ -26,6 +26,10 @@ const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, '') || '/';
 // 计算当前路径，用于高亮判断。统一去除末尾斜杠便于前缀匹配。
 const pathname = Astro.url.pathname.replace(/\/$/, '') || '/';
 
+// 首页判断：首页顶部为浅紫粒子动态背景，Header 需透明 + 深色文字；
+// 滚动离开 Hero 后平滑过渡为浅紫白毛玻璃背景。非首页保持原有浅色实体 Header。
+const isHome = pathname === '/';
+
 function isActive(item: (typeof navItems)[number]): boolean {
   const prefix = (item.matchPrefix ?? item.path).replace(/\/$/, '') || '/';
   if (prefix === '/') {
@@ -35,11 +39,11 @@ function isActive(item: (typeof navItems)[number]): boolean {
 }
 ---
 
-<header class="header" id="site-header">
+<header class="header" id="site-header" data-home={isHome ? 'true' : 'false'}>
   <div class="container header__inner">
     <!-- 左：品牌区（Logo + 名称 + 简介） -->
     <a href={withBase('/')} class="header__brand" aria-label={`${site.team} ${site.name} 首页`}>
-      <Logo size={36} />
+      <Logo size={42} />
       <span class="header__brand-text">
         <span class="header__site-name">{site.name}</span>
         <span class="header__brief">{site.brief}</span>
@@ -200,10 +204,31 @@ function isActive(item: (typeof navItems)[number]): boolean {
     return bar != null && bar.getAttribute('data-visible') === 'true';
   }
 
+  // 首页粒子背景协调：首页顶部 Header 透明+深色文字（叠在浅紫粒子背景上），
+  // 滚动离开 Hero 区域后平滑过渡为浅紫白毛玻璃背景。非首页 Header 始终保持浅色实体。
+  // 通过 body[data-header-scrolled] 驱动 CSS 切换，与显隐机制独立、不冲突。
+  const headerEl = document.getElementById('site-header');
+  const isHomePage = headerEl?.getAttribute('data-home') === 'true';
+  let scrolledPastHero = false;
+
+  function updateHomeHeaderBg(currentY: number): void {
+    if (!isHomePage) return;
+    // Hero 高度约 90vh，滚动超过 60% 视口高度即视为离开 Hero
+    const threshold = window.innerHeight * 0.6;
+    const past = currentY > threshold;
+    if (past !== scrolledPastHero) {
+      scrolledPastHero = past;
+      document.body.setAttribute('data-header-scrolled', String(past));
+    }
+  }
+
   function updateHeaderState(): void {
     ticking = false;
     const currentY = window.scrollY;
     const delta = currentY - lastScrollY;
+
+    // 首页：无论是否处于显隐逻辑，都同步 Hero 背景状态
+    updateHomeHeaderBg(currentY);
 
     // 顶部：完整显示
     if (currentY <= SCROLL_HIDE_THRESHOLD) {
@@ -252,7 +277,11 @@ function isActive(item: (typeof navItems)[number]): boolean {
 
   // 初始化默认可见
   document.body.setAttribute('data-header-hidden', 'false');
+  // 首页：初始化 Hero 背景状态（页面加载时可能已滚动，或刷新于文章区）
+  updateHomeHeaderBg(window.scrollY);
   window.addEventListener('scroll', onScroll, { passive: true });
+  // 视口尺寸变化时重新计算 Hero 阈值（如旋转屏幕、调整窗口）
+  window.addEventListener('resize', () => updateHomeHeaderBg(window.scrollY), { passive: true });
 </script>
 
 <style>
@@ -276,8 +305,112 @@ function isActive(item: (typeof navItems)[number]): boolean {
     transform: translateY(0);
     transition:
       transform var(--transition-base, 250ms) cubic-bezier(0.4, 0, 0.2, 1),
-      opacity var(--transition-base, 250ms) ease;
+      opacity var(--transition-base, 250ms) ease,
+      background-color var(--transition-base, 250ms) ease,
+      border-color var(--transition-base, 250ms) ease,
+      box-shadow var(--transition-base, 250ms) ease;
     will-change: transform;
+  }
+
+  /* ─── 首页 Header 背景与文字配色 ───────────────────────────
+   * 首页顶部为浅紫粒子动态背景（#e8e8fd 底 + #5b0693 紫色粒子）：
+   * - 未滚动（body[data-header-scrolled='false']，默认）：Header 透明，文字/图标深色，
+   *   去掉边框与阴影，让粒子透出，避免在浅紫背景上出现白色实体条断层。
+   * - 已滚动离开 Hero（body[data-header-scrolled='true']）：平滑过渡为浅紫白毛玻璃
+   *   （rgba(255,255,255,0.7) + backdrop-filter blur），文字保持深色，保证对比度。
+   * 非首页 #site-header[data-home='false'] 不命中以下规则，保持原浅色实体样式。
+   */
+  #site-header[data-home='true'] {
+    --home-header-text: #2b2640;
+    --home-header-text-muted: #4a4660;
+  }
+
+  /* 首页未滚动（Hero 区）：透明背景 + 深色文字，无边框无阴影 */
+  body[data-header-scrolled='false'] #site-header[data-home='true'],
+  body:not([data-header-scrolled]) #site-header[data-home='true'] {
+    background-color: transparent;
+    border-color: transparent;
+    box-shadow: none;
+  }
+
+  body[data-header-scrolled='false'] #site-header[data-home='true'] .header__site-name,
+  body:not([data-header-scrolled]) #site-header[data-home='true'] .header__site-name {
+    color: var(--home-header-text);
+  }
+
+  body[data-header-scrolled='false'] #site-header[data-home='true'] .header__brief,
+  body:not([data-header-scrolled]) #site-header[data-home='true'] .header__brief {
+    color: var(--home-header-text-muted);
+  }
+
+  body[data-header-scrolled='false'] #site-header[data-home='true'] .header__nav-link,
+  body:not([data-header-scrolled]) #site-header[data-home='true'] .header__nav-link {
+    color: var(--home-header-text-muted);
+  }
+
+  body[data-header-scrolled='false'] #site-header[data-home='true'] .header__nav-link:hover,
+  body:not([data-header-scrolled]) #site-header[data-home='true'] .header__nav-link:hover {
+    color: var(--home-header-text);
+  }
+
+  body[data-header-scrolled='false'] #site-header[data-home='true'] .header__nav-link.is-active,
+  body:not([data-header-scrolled]) #site-header[data-home='true'] .header__nav-link.is-active {
+    color: var(--home-header-text);
+  }
+
+  body[data-header-scrolled='false'] #site-header[data-home='true'] .header__search,
+  body:not([data-header-scrolled]) #site-header[data-home='true'] .header__search {
+    color: var(--home-header-text-muted);
+  }
+
+  body[data-header-scrolled='false'] #site-header[data-home='true'] .header__search:hover,
+  body:not([data-header-scrolled]) #site-header[data-home='true'] .header__search:hover {
+    color: var(--home-header-text);
+    background-color: rgba(91, 6, 147, 0.12);
+  }
+
+  body[data-header-scrolled='false'] #site-header[data-home='true'] .header__toggle,
+  body:not([data-header-scrolled]) #site-header[data-home='true'] .header__toggle {
+    color: var(--home-header-text);
+  }
+
+  /* 首页已滚动（离开 Hero）：浅紫白毛玻璃背景 + 深色文字 */
+  body[data-header-scrolled='true'] #site-header[data-home='true'] {
+    background-color: rgba(255, 255, 255, 0.72);
+    border-color: rgba(91, 6, 147, 0.12);
+    box-shadow: 0 2px 16px rgba(91, 6, 147, 0.1);
+    backdrop-filter: blur(10px) saturate(140%);
+    -webkit-backdrop-filter: blur(10px) saturate(140%);
+  }
+
+  body[data-header-scrolled='true'] #site-header[data-home='true'] .header__site-name {
+    color: var(--home-header-text);
+  }
+
+  body[data-header-scrolled='true'] #site-header[data-home='true'] .header__brief {
+    color: var(--home-header-text-muted);
+  }
+
+  body[data-header-scrolled='true'] #site-header[data-home='true'] .header__nav-link {
+    color: var(--home-header-text-muted);
+  }
+
+  body[data-header-scrolled='true'] #site-header[data-home='true'] .header__nav-link:hover,
+  body[data-header-scrolled='true'] #site-header[data-home='true'] .header__nav-link.is-active {
+    color: var(--home-header-text);
+  }
+
+  body[data-header-scrolled='true'] #site-header[data-home='true'] .header__search {
+    color: var(--home-header-text-muted);
+  }
+
+  body[data-header-scrolled='true'] #site-header[data-home='true'] .header__search:hover {
+    color: var(--home-header-text);
+    background-color: rgba(91, 6, 147, 0.12);
+  }
+
+  body[data-header-scrolled='true'] #site-header[data-home='true'] .header__toggle {
+    color: var(--home-header-text);
   }
 
   /* 下滑隐藏：body[data-header-hidden='true'] 时上滑收回视口外 */
@@ -381,8 +514,8 @@ function isActive(item: (typeof navItems)[number]): boolean {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
     border-radius: var(--radius-md);
     color: var(--color-text-muted);
     transition:
@@ -403,8 +536,8 @@ function isActive(item: (typeof navItems)[number]): boolean {
   /* 汉堡按钮（仅移动端） */
   .header__toggle {
     display: none;
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
     align-items: center;
     justify-content: center;
     border-radius: var(--radius-md);
@@ -483,6 +616,28 @@ function isActive(item: (typeof navItems)[number]): boolean {
   .mobile-nav__link.is-active {
     color: var(--color-brand);
     font-weight: var(--fw-semibold);
+  }
+
+  /* 首页移动端折叠面板：跟随首页 Header 配色（浅紫白毛玻璃 + 深色文字），
+   * 与浅紫粒子背景协调，避免在 Hero 上展开时出现深紫实体条断层。 */
+  #site-header[data-home='true'] .mobile-nav {
+    background-color: rgba(255, 255, 255, 0.85);
+    border-top-color: rgba(91, 6, 147, 0.1);
+    backdrop-filter: blur(10px) saturate(140%);
+    -webkit-backdrop-filter: blur(10px) saturate(140%);
+  }
+
+  #site-header[data-home='true'] .mobile-nav__link {
+    color: var(--home-header-text-muted, #4a4660);
+    border-bottom-color: rgba(91, 6, 147, 0.1);
+  }
+
+  #site-header[data-home='true'] .mobile-nav__link:hover {
+    color: var(--home-header-text, #2b2640);
+  }
+
+  #site-header[data-home='true'] .mobile-nav__link.is-active {
+    color: var(--home-header-text, #2b2640);
   }
 
   /* 响应式：≤768px 切换为移动导航

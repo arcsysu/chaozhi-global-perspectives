@@ -20,7 +20,7 @@
 
 .article-prose {
   font-family: var(--font-serif); /* 衬线体：思源宋体/Noto Serif SC + Georgia */
-  font-size: 15px; /* 正文固定 15px — 桌面与移动端统一基准 */
+  font-size: 17px; /* 正文固定 15px — 桌面与移动端统一基准 */
   line-height: 1.85; /* 中文行距加大，减少视觉疲劳 */
   color: #33303f; /* 柔和深灰，非纯黑，降低对比刺激 */
   letter-spacing: 0.01em; /* 中文微调字间距 */

@@ -70,7 +70,7 @@ const {
   headings = [],
   markdownBody = '',
   backHref = withBase('/'),
-  backLabel = '返回首页',
+  backLabel = '返回上一页',
   prev = null,
   next = null,
   linkPrefix = '/articles/',
@@ -94,9 +94,9 @@ const isDemo = meta.isDemo ?? false;
 
     {/* 中栏：标题 → 发布时间 → 摘要 → 标签 → 横线 → 正文 + 导航 */}
     <main class="article-layout__main">
-      {/* 返回入口 */}
+      {/* 返回入口（data-back-nav 供 JS 拦截，href 保留为无脚本回退） */}
       <nav class="article-back" aria-label="返回导航">
-        <a href={backHref} class="article-back__link">← {backLabel}</a>
+        <a href={backHref} class="article-back__link" data-back-nav data-back-href={backHref}>← {backLabel}</a>
         {isDemo && <span class="article-back__demo-tag">Demo 预览</span>}
       </nav>
 
@@ -206,6 +206,65 @@ const isDemo = meta.isDemo ?? false;
   }
 </script>
 
+<script>
+  /**
+   * 返回导航增强（返回上一页）：
+   * 优先使用 history.back() 恢复来源页面及滚动位置（依赖浏览器 bfcache 原生滚动恢复）。
+   * 仅当确认存在站内来源（document.referrer 同源 + history.length > 1）时才尝试 back()，
+   * 否则安全回退到首页（backHref）。另设 pagehide 超时兜底，防止 back() 无效时卡留当前页。
+   * 不影响浏览器原生后退/前进按钮、文章末尾"下一篇文章"导航。
+   */
+  function initBackNav() {
+    const link = document.querySelector('[data-back-nav]') as HTMLAnchorElement | null;
+    if (!link) return;
+
+    const fallbackHref = link.getAttribute('data-back-href') || '/';
+
+    link.addEventListener('click', (e: MouseEvent) => {
+      // 中键/右键/Ctrl(Cmd)+点击/Shift+点击等走原生行为（新标签页等）
+      if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+
+      e.preventDefault();
+
+      // 判断是否有可靠的站内来源页面：
+      // 1. document.referrer 同源 → 来源是站内页面（排除外部链接/书签/直接打开）
+      // 2. history.length > 1 → 当前标签页有历史记录可回退（排除新标签页打开）
+      let hasInSiteSource = false;
+      try {
+        if (document.referrer) {
+          const refUrl = new URL(document.referrer, window.location.href);
+          hasInSiteSource = refUrl.origin === window.location.origin;
+        }
+      } catch (_) {
+        hasInSiteSource = false;
+      }
+      const hasHistory = window.history.length > 1;
+
+      if (!hasInSiteSource || !hasHistory) {
+        // 无可靠站内历史：安全回退首页
+        window.location.href = fallbackHref;
+        return;
+      }
+
+      // 有站内来源且有历史：history.back() 恢复来源页面及滚动位置
+      // pagehide 超时兜底：若 back() 未触发页面卸载（极端边界），回退首页
+      let unloaded = false;
+      window.addEventListener('pagehide', () => { unloaded = true; }, { once: true });
+      window.setTimeout(() => {
+        if (!unloaded) window.location.href = fallbackHref;
+      }, 500);
+
+      history.back();
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initBackNav);
+  } else {
+    initBackNav();
+  }
+</script>
+
 <style>
   /* 三栏布局容器 */
   .article-layout {
@@ -304,7 +363,7 @@ const isDemo = meta.isDemo ?? false;
 
   .article-head__summary {
     margin-top: var(--space-sm, 12px);
-    font-size: 13px; /* 摘要固定 13px */
+    font-size: 14px; /* 文章摘要字号，可手动调整 — 原 13px → 14px */
     font-style: italic; /* 摘要斜体，仅作用于文章详情页摘要 */
     color: var(--color-text-muted, #767289);
     line-height: 1.6;
@@ -383,7 +442,7 @@ const isDemo = meta.isDemo ?? false;
     }
 
     .article-head__summary {
-      font-size: 13px; /* 摘要固定 13px，移动端不变 */
+      font-size: 14px; /* 文章摘要字号，可手动调整 — 移动端与桌面端保持一致 */
     }
 
     .article-head__published {

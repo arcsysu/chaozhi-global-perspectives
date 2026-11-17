@@ -106,3 +106,8 @@
 .stack > * + * {
   margin-top: var(--space-lg);
 }
+
+/* 分页锚点跳转：避开 sticky Header 遮挡，确保 #latest-articles 定位后内容不被遮挡 */
+#latest-articles {
+  scroll-margin-top: calc(var(--height-header, 4rem) + var(--space-md, 1rem));
+}
