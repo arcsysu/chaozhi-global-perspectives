@@ -30,3 +30,6 @@ Thumbs.db
 # 仅用于本地开发测试，不提交、不发布到公开仓库
 # 生产构建时 content.config.ts 通过环境门控使该 Collection 不加载任何内容
 src/content/_demo/
+
+# build cache
+cache/

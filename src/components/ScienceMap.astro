@@ -483,18 +483,55 @@ const NODES = [
     document.addEventListener('visibilitychange', handleVisibility);
 
     // ─── 清理：组件卸载时移除 rAF 和事件 ────────
-    // Astro 客户端导航时不触发，但静态页面刷新/关闭时浏览器自动回收。
-    // 此清理主要防止 SPA 式场景中的重复初始化。
-    window.addEventListener('pagehide', () => {
-      if (rafId !== null) cancelAnimationFrame(rafId);
+    // 将清理句柄提升到模块作用域，供 astro:before-swap（离开首页时）调用。
+    // pagehide 仅在整页卸载（刷新/关闭）时触发，Astro 客户端导航不触发，
+    // 因此额外监听 astro:before-swap 以覆盖站内导航离开首页的场景。
+    cleanup = () => {
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
       document.removeEventListener('visibilitychange', handleVisibility);
-    }, { once: true });
+    };
+    window.addEventListener('pagehide', () => cleanup?.(), { once: true });
   }
 
-  // 初始化：DOM 就绪后执行
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initScienceMap, { once: true });
-  } else {
+  // ─── 生命周期句柄（模块作用域）────────────────
+  // initScienceMap 执行后，cleanup 指向取消 rAF + 移除 visibilitychange 的函数。
+  // 每次离开首页（astro:before-swap）时调用 cleanup，避免 rAF 持续运行引用已分离 DOM。
+  let cleanup: (() => void) | null = null;
+
+  // ─── 初始化时机 ────────────────────────────────
+  // astro:page-load：每次页面加载后触发（首次加载 + 每次 ClientRouter 导航后）。
+  // 仅当当前页存在 .science-map__svg（即首页）时初始化。
+  // 这样从文章页返回首页时可重新启动动画，离开首页时由 astro:before-swap 清理。
+  function maybeInitScienceMap(): void {
+    const svg = document.querySelector('.science-map__svg');
+    if (!svg) {
+      // 当前页无 ScienceMap（非首页）：清理可能残留的上一轮实例
+      cleanup?.();
+      cleanup = null;
+      return;
+    }
+    // 当前页有 ScienceMap：若已运行则不重复初始化
+    if (cleanup) return;
     initScienceMap();
+  }
+
+  // astro:before-swap：站内导航离开当前页前触发。取消 rAF，防止动画循环
+  // 持续引用即将被替换/分离的首页 SVG 节点（避免内存泄漏与"幻影"动画）。
+  document.addEventListener('astro:before-swap', () => {
+    cleanup?.();
+    cleanup = null;
+  });
+
+  // astro:page-load：页面加载后初始化（首页）或清理（非首页）。
+  document.addEventListener('astro:page-load', maybeInitScienceMap);
+
+  // 首次加载（无 ClientRouter SSR 直达时 astro:page-load 也会触发，此处冗余兜底）。
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', maybeInitScienceMap, { once: true });
+  } else {
+    maybeInitScienceMap();
   }
 </script>

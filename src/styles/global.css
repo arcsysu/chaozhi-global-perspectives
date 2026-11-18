@@ -185,6 +185,12 @@
 
 html {
   font-size: var(--fs-root);
+  /* 预留滚动条空间，消除页面切换时 Header 横向抖动。
+   * 不同页面内容高度不同，垂直滚动条出现/消失会使 documentElement.clientWidth
+   * 变化约 15px，导致 margin-inline:auto 居中的 Header 水平中心偏移而抖动。
+   * stable 让所有页面统一预留滚动条槽位，clientWidth 保持一致。
+   * 移动端 overlay 滚动条不占宽度，不受影响。 */
+  scrollbar-gutter: stable;
 }
 
 body {

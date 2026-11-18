@@ -39,7 +39,7 @@ function isActive(item: (typeof navItems)[number]): boolean {
 }
 ---
 
-<header class="header" id="site-header" data-home={isHome ? 'true' : 'false'}>
+<header class="header" id="site-header" data-home={isHome ? 'true' : 'false'} transition:persist>
   <div class="container header__inner">
     <!-- 左：品牌区（Logo + 名称 + 简介） -->
     <a href={withBase('/')} class="header__brand" aria-label={`${site.team} ${site.name} 首页`}>
@@ -134,7 +134,96 @@ function isActive(item: (typeof navItems)[number]): boolean {
 </header>
 
 <script>
+  // ──────────────────────────────────────────────
+  // Header 客户端脚本（兼容 Astro ClientRouter + transition:persist）
+  //
+  // Header 使用 transition:persist：站内导航时同一 <header> DOM 节点被保留，
+  // Logo 图片不被销毁重建，消除"消失再出现"闪烁。但持久化带来三个问题，
+  // 以下逐一处理：
+  //
+  // 1. 导航高亮 / data-home 不更新：
+  //    persist 的 Header 携带首次渲染时的 aria-current / is-active / data-home，
+  //    切到新页面后这些标记仍是旧页面的。需在每次导航后根据新 URL 重新计算。
+  //
+  // 2. isHomePage 闭包陈旧：
+  //    原实现 const isHomePage = headerEl?.getAttribute('data-home') === 'true'
+  //    在脚本首次执行时定型，导航后不更新。改为每次实时读取 data-home。
+  //
+  // 3. 滚动监听重复绑定：
+  //    persist 元素的 <script> 仅在首次加载执行一次（不会随导航重跑），
+  //    因此 scroll/resize 监听天然只注册一次，无需去重。但页面级状态
+  //    （hidden / scrolledPastHero / lastScrollY）需在每次导航后重置，
+  //    否则离开文章页时 hidden=true 会残留，Header 在新页面持续隐藏。
+  //
+  // 导航生命周期：
+  // - astro:page-load：每次页面加载后触发（含首次加载 + 每次 ClientRouter 导航后）。
+  //   用于重置状态、重新同步 data-home / 导航高亮 / Hero 背景。
+  // ──────────────────────────────────────────────
+
+  /** 主导航项（与 site.ts navItems 同步，用于客户端高亮判断） */
+  interface NavItemClient {
+    label: string;
+    path: string;
+    matchPrefix: string;
+  }
+  const NAV_ITEMS: NavItemClient[] = [
+    { label: '首页', path: '/', matchPrefix: '/' },
+    { label: '主题', path: '/topics/', matchPrefix: '/topics' },
+    { label: '时间树', path: '/archive/', matchPrefix: '/archive' },
+    { label: '关于我们', path: '/about/', matchPrefix: '/about' },
+  ];
+
+  /** BASE_URL（去除末尾斜杠），用于比对 navItem.path */
+  const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, '') || '/';
+
+  /** 判断给定 pathname 是否匹配某导航项（与 Astro 端 isActive 逻辑一致） */
+  function navItemIsActive(item: NavItemClient, pathname: string): boolean {
+    // 去除 BASE_URL 前缀，得到站点相对路径
+    let rel = pathname;
+    if (BASE_URL !== '/' && rel.startsWith(BASE_URL)) {
+      rel = rel.slice(BASE_URL.length);
+    }
+    rel = rel.replace(/\/$/, '') || '/';
+    const prefix = (item.matchPrefix ?? item.path).replace(/\/$/, '') || '/';
+    if (prefix === '/') return rel === '/';
+    return rel === prefix || rel.startsWith(prefix + '/');
+  }
+
+  /** 根据当前 URL 更新持久 Header 的导航高亮与 data-home（每次导航后调用） */
+  function syncHeaderForCurrentPage(): void {
+    const headerEl = document.getElementById('site-header');
+    if (!headerEl) return;
+
+    const pathname = window.location.pathname;
+    const isHome = pathname === (BASE_URL === '/' ? '/' : BASE_URL + '/') || pathname === BASE_URL;
+    headerEl.setAttribute('data-home', String(isHome));
+
+    // 更新桌面导航高亮
+    const desktopLinks = headerEl.querySelectorAll<HTMLAnchorElement>('.header__nav-link');
+    desktopLinks.forEach((link, i) => {
+      const item = NAV_ITEMS[i];
+      if (!item) return;
+      const active = navItemIsActive(item, pathname);
+      link.classList.toggle('is-active', active);
+      if (active) link.setAttribute('aria-current', 'page');
+      else link.removeAttribute('aria-current');
+    });
+
+    // 更新移动端导航高亮
+    const mobileLinks = headerEl.querySelectorAll<HTMLAnchorElement>('.mobile-nav__link');
+    mobileLinks.forEach((link, i) => {
+      const item = NAV_ITEMS[i];
+      if (!item) return;
+      const active = navItemIsActive(item, pathname);
+      link.classList.toggle('is-active', active);
+      if (active) link.setAttribute('aria-current', 'page');
+      else link.removeAttribute('aria-current');
+    });
+  }
+
+  // ──────────────────────────────────────────────
   // 移动端导航折叠交互（原生 JS，无依赖）
+  // ──────────────────────────────────────────────
   const toggle = document.querySelector<HTMLButtonElement>('.header__toggle');
   const panel = document.getElementById('mobile-nav');
 
@@ -190,6 +279,8 @@ function isActive(item: (typeof navItems)[number]): boolean {
   // — 文章页与阅读栏互斥：body.has-reading-bar 时，阅读栏负责标题离开视口的切换，
   //   本协调器仅处理"标题可见区"之外的滚动隐藏/展开，避免竞争。
   // — 移动端菜单展开时禁用隐藏，避免导航被收走。
+  // — isHomePage 改为实时读取 data-home（每次导航后由 syncHeaderForCurrentPage 更新），
+  //   避免持久 Header 的闭包陈旧。
   // ──────────────────────────────────────────────
 
   const SCROLL_HIDE_THRESHOLD = 12; // 滚动超过 12px 才允许隐藏（避免页面顶部抖动）
@@ -198,21 +289,31 @@ function isActive(item: (typeof navItems)[number]): boolean {
   let lastScrollY = window.scrollY;
   let ticking = false;
   let hidden = false; // 当前 Header 是否隐藏
+  let scrolledPastHero = false; // 首页是否已离开 Hero 区
 
   function isReadingBarVisible(): boolean {
     const bar = document.getElementById('reading-bar');
     return bar != null && bar.getAttribute('data-visible') === 'true';
   }
 
+  /** 实时判断当前是否首页（读取持久 Header 的 data-home，导航后已更新） */
+  function isHomePageNow(): boolean {
+    const headerEl = document.getElementById('site-header');
+    return headerEl?.getAttribute('data-home') === 'true';
+  }
+
   // 首页粒子背景协调：首页顶部 Header 透明+深色文字（叠在浅紫粒子背景上），
   // 滚动离开 Hero 区域后平滑过渡为浅紫白毛玻璃背景。非首页 Header 始终保持浅色实体。
   // 通过 body[data-header-scrolled] 驱动 CSS 切换，与显隐机制独立、不冲突。
-  const headerEl = document.getElementById('site-header');
-  const isHomePage = headerEl?.getAttribute('data-home') === 'true';
-  let scrolledPastHero = false;
-
   function updateHomeHeaderBg(currentY: number): void {
-    if (!isHomePage) return;
+    if (!isHomePageNow()) {
+      // 非首页：确保不残留首页的 scrolled 标记
+      if (document.body.getAttribute('data-header-scrolled') !== null) {
+        document.body.removeAttribute('data-header-scrolled');
+      }
+      scrolledPastHero = false;
+      return;
+    }
     // Hero 高度约 90vh，滚动超过 60% 视口高度即视为离开 Hero
     const threshold = window.innerHeight * 0.6;
     const past = currentY > threshold;
@@ -275,13 +376,29 @@ function isActive(item: (typeof navItems)[number]): boolean {
     }
   }
 
-  // 初始化默认可见
-  document.body.setAttribute('data-header-hidden', 'false');
-  // 首页：初始化 Hero 背景状态（页面加载时可能已滚动，或刷新于文章区）
-  updateHomeHeaderBg(window.scrollY);
+  /**
+   * 页面进入后重置 Header 状态（每次导航后调用，含首次加载）。
+   * - 重置 hidden / scrolledPastHero / lastScrollY，避免跨页面残留。
+   * - 重新同步导航高亮 / data-home。
+   * - 清理可能残留的首页 scrolled 标记（离开首页时）。
+   */
+  function resetHeaderForNavigation(): void {
+    hidden = false;
+    scrolledPastHero = false;
+    lastScrollY = window.scrollY;
+    document.body.setAttribute('data-header-hidden', 'false');
+    syncHeaderForCurrentPage();
+    updateHomeHeaderBg(window.scrollY);
+  }
+
+  // 持久 Header 的脚本仅执行一次：注册 scroll/resize 监听（不会重复）。
   window.addEventListener('scroll', onScroll, { passive: true });
   // 视口尺寸变化时重新计算 Hero 阈值（如旋转屏幕、调整窗口）
   window.addEventListener('resize', () => updateHomeHeaderBg(window.scrollY), { passive: true });
+
+  // astro:page-load：每次页面加载后触发（首次加载 + 每次 ClientRouter 站内导航后）。
+  // 在此重置 Header 状态并重新同步导航高亮 / data-home / Hero 背景。
+  document.addEventListener('astro:page-load', resetHeaderForNavigation);
 </script>
 
 <style>

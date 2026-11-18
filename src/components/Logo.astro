@@ -20,16 +20,27 @@ interface Props {
 }
 
 const { size = 50, label = 'YatCC 龙形标志' } = Astro.props;
-const logoSrc = withBase('/yatcc-logo.png');
+// 资源路径修正：原引用 '/yatcc-logo.png'（位于项目根目录，未被 Astro 作为静态资源输出，
+// 导致浏览器请求 404，Logo 加载失败而短暂消失）。改用 public/yatcc-dragon.png，
+// 该文件实际存在且会被 Astro 输出到 dist 根目录。
+const logoSrc = withBase('/yatcc-dragon.png');
+// 龙形图实际像素尺寸（587×427，宽高比约 1.376），用于精确计算固定占位宽度，
+// 避免 <img> 加载前后因尺寸属性不一致导致布局位移。
+const LOGO_RATIO = 587 / 427; // ≈ 1.376
 ---
 
-<span class="logo" role="img" aria-label={label} style={`--logo-size: ${size}px`}>
+<span
+  class="logo"
+  role="img"
+  aria-label={label}
+  style={`--logo-size: ${size}px; --logo-width: calc(${size}px * ${LOGO_RATIO})`}
+>
   <img
     class="logo__img"
     src={logoSrc}
     alt={label}
-    width="600"
-    height="600"
+    width="587"
+    height="427"
     loading="eager"
     decoding="async"
     aria-hidden="true"
@@ -41,8 +52,12 @@ const logoSrc = withBase('/yatcc-logo.png');
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    /* 固定宽高：无论图片是否加载完成，容器都保持固定尺寸，
+     * 避免图片加载失败时宽度塌缩导致品牌文字左移、加载成功时撑开导致右移。
+     * flex: 0 0 禁止 Flexbox 压缩或拉伸。 */
+    width: var(--logo-width);
     height: var(--logo-size);
-    flex-shrink: 0;
+    flex: 0 0 var(--logo-width);
   }
 
   /* 龙形图案按高度等比缩放，宽度自动跟随（原图 587×427，宽高比约 1.376） */

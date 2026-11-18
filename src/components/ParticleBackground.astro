@@ -79,13 +79,26 @@
   const isMobile = window.matchMedia('(max-width: 768px)').matches;
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  // reduced-motion：不初始化粒子动画，仅保留 CSS 纯色背景
-  if (!reducedMotion) {
-    // 动态加载 tsParticles CDN（v2.12.0，与 Background Lab 附件一致）
-    const script = document.createElement('script');
-    script.src = 'https://cdn.jsdelivr.net/npm/tsparticles@2.12.0/tsparticles.bundle.min.js';
-    script.async = true;
-    script.onload = () => {
+  // ─── 生命周期句柄（模块作用域）────────────────────
+  // Astro ClientRouter 站内导航离开首页时，#particle-bg DOM 被替换，
+  // 但 tsParticles 实例的动画循环与 visibilitychange 监听仍会残留。
+  // 此处保存 cleanup 句柄，供 astro:before-swap 调用，避免 Canvas/监听累积。
+  let particleCleanup: (() => void) | null = null;
+  let cdnLoaded = false; // CDN 脚本是否已加载（避免重复注入 <script>）
+
+  /** 初始化粒子背景（仅当前页存在 #tsparticles 容器时，即首页） */
+  function initParticleBackground(): void {
+    // 先清理上一轮残留实例/监听（若存在）
+    particleCleanup?.();
+    particleCleanup = null;
+
+    const container = document.getElementById('tsparticles');
+    if (!container) return; // 非首页：无容器，不初始化
+
+    // reduced-motion：不初始化粒子动画，仅保留 CSS 纯色背景
+    if (reducedMotion) return;
+
+    const onLoad = () => {
       const tsparticles = (window as any).tsParticles;
       if (!tsparticles) return;
 
@@ -154,23 +167,63 @@
           if (!instance) return;
 
           // 页面隐藏时暂停动画，可见时恢复，节省 CPU/电量
-          document.addEventListener('visibilitychange', () => {
+          // 用具名函数以便后续 removeEventListener 清理（避免监听累积）
+          const onVisibility = () => {
             if (document.hidden) {
               instance.pause();
             } else {
               instance.play();
             }
-          });
+          };
+          document.addEventListener('visibilitychange', onVisibility);
+
+          // 注册清理：离开首页时销毁实例 + 移除监听
+          particleCleanup = () => {
+            document.removeEventListener('visibilitychange', onVisibility);
+            instance.destroy?.();
+          };
         })
         .catch((err: unknown) => {
           // 加载/初始化失败时静默降级为纯色背景（CSS 已提供 #e8e8fd 底色）
           console.warn('[ParticleBackground] tsParticles init failed:', err);
         });
     };
-    script.onerror = () => {
-      // CDN 加载失败：静默降级，CSS 纯色背景已兜底
-      console.warn('[ParticleBackground] tsParticles CDN load failed, falling back to solid color.');
-    };
-    document.head.appendChild(script);
+
+    if (cdnLoaded) {
+      // CDN 已加载（从文章页返回首页）：直接初始化
+      onLoad();
+    } else {
+      // 首次：动态加载 tsParticles CDN（v2.12.0，与 Background Lab 附件一致）
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/tsparticles@2.12.0/tsparticles.bundle.min.js';
+      script.async = true;
+      script.onload = () => {
+        cdnLoaded = true;
+        onLoad();
+      };
+      script.onerror = () => {
+        // CDN 加载失败：静默降级，CSS 纯色背景已兜底
+        console.warn('[ParticleBackground] tsParticles CDN load failed, falling back to solid color.');
+      };
+      document.head.appendChild(script);
+    }
+  }
+
+  // astro:before-swap：站内导航离开当前页前触发。
+  // 销毁 tsParticles 实例 + 移除 visibilitychange 监听，避免 Canvas/监听累积。
+  document.addEventListener('astro:before-swap', () => {
+    particleCleanup?.();
+    particleCleanup = null;
+  });
+
+  // astro:page-load：每次页面加载后触发（首次加载 + 每次 ClientRouter 导航后）。
+  // 首页：初始化粒子背景；非首页：仅清理（上面 before-swap 已清理，此处冗余兜底）。
+  document.addEventListener('astro:page-load', initParticleBackground);
+
+  // 首次加载兜底（astro:page-load 在 ClientRouter 下会触发，此处兼容 SSR 直达）
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initParticleBackground, { once: true });
+  } else {
+    initParticleBackground();
   }
 </script>

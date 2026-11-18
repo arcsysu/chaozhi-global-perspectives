@@ -1,11 +1,19 @@
 ---
 /**
- * 时间树页 (/archive/)
+ * 时间树页 (/archive/) — Editorial Timeline
  *
- * 根据文章发布时间自动生成年份与月份层级归档。
- * 年份倒序排列，年份下的月份倒序排列。
- * 只显示有已发布文章的月份。
- * 点击年份进入该年全部文章合集，点击月份进入该月文章合集。
+ * 现代杂志式纵向时间归档：
+ * - 左侧大字号年份 + 文章总数
+ * - 中间极细纵向时间轴（连续竖线 + 年份节点）
+ * - 右侧开放式三栏月份索引（月份数字 + 英文缩写 + 文章数）
+ *
+ * 数据来源：getArchiveTree()（按 publishedAt 聚合年→月→文章数）。
+ * 年份倒序、月份倒序。仅显示有文章的月份。
+ * 年份链接 → /archive/<year>/，月份链接 → /archive/<year>/<month>/。
+ * DEV 环境含 Demo 文章（用 sourceTime 模拟 publishedAt），PROD 自动隔离。
+ *
+ * 设计语言与 topics/index.astro 杂志式主题索引统一：
+ * 浅紫白背景、深灰紫文字、克制的品牌紫强调、精确对齐、细分隔线。
  */
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import Container from '@/components/Container.astro';
@@ -15,133 +23,581 @@ import { withBase } from '@/utils/site';
 
 const archiveTree = await getArchiveTree();
 
-/** 月份编号转中文显示 */
-const monthNames: Record<string, string> = {
-  '01': '1月', '02': '2月', '03': '3月', '04': '4月',
-  '05': '5月', '06': '6月', '07': '7月', '08': '8月',
-  '09': '9月', '10': '10月', '11': '11月', '12': '12月',
+/** 月份编号 → 英文缩写 */
+const monthAbbr: Record<string, string> = {
+  '01': 'JAN', '02': 'FEB', '03': 'MAR', '04': 'APR',
+  '05': 'MAY', '06': 'JUN', '07': 'JUL', '08': 'AUG',
+  '09': 'SEP', '10': 'OCT', '11': 'NOV', '12': 'DEC',
 };
+
+/** 年份范围（底部辅助信息） */
+const years = archiveTree.map((n) => n.year);
+const yearRange =
+  years.length === 0
+    ? ''
+    : years.length === 1
+      ? years[0]
+      : `${years[years.length - 1]} — ${years[0]}`;
 ---
 
-<BaseLayout title="时间树">
+<BaseLayout
+  title="时间树"
+  description="沿着时间的脉络，回顾科学与计算的前沿进展。"
+>
   <Container>
-    <section class="page-header">
-      <h1 class="page-header__title">时间树</h1>
-      <p class="page-header__subtitle">
-        按时间归档浏览全部观察文章。根据发布时间自动生成年份与月份层级。
-      </p>
-    </section>
+    <div class="timeline-page">
+      {/* ── 顶部栏目介绍 ── */}
+      <div class="timeline-masthead" aria-hidden="true">
+        <span>CHAOZHI / CHRONOLOGICAL ARCHIVE</span>
+        <span>HPC · AI · SCIENCE</span>
+      </div>
 
-    <section class="stack" aria-label="时间归档">
+      <header class="timeline-intro">
+        <p class="timeline-intro__section">ARCHIVE / 01</p>
+        <h1 class="timeline-intro__title">时间树</h1>
+        <p class="timeline-intro__desc">沿着时间的脉络，回顾科学与计算的前沿进展。</p>
+      </header>
+
+      <span class="timeline-intro__rule" aria-hidden="true"></span>
+
+      {/* ── 主体：纵向年份时间轴 ── */}
+      <section class="timeline-body" aria-label="时间归档">
+        {
+          archiveTree.length === 0 ? (
+            <p class="empty-state">暂无已发布文章，归档将在文章发布后自动生成。</p>
+          ) : (
+            <ol class="timeline" role="list">
+              {archiveTree.map((yearNode, yearIndex) => (
+                <li class="timeline-year" data-year-index={yearIndex}>
+                  {/* 左侧：年份区域 */}
+                  <div class="timeline-year__head">
+                    <a
+                      href={withBase(`/archive/${yearNode.year}/`)}
+                      class="timeline-year__link"
+                    >
+                      <span class="timeline-year__label">YEAR / {String(yearIndex + 1).padStart(2, '0')}</span>
+                      <span class="timeline-year__number" aria-label={`${yearNode.year} 年`}>{yearNode.year}</span>
+                      <span class="timeline-year__count">{yearNode.count} 篇文章</span>
+                    </a>
+                  </div>
+
+                  {/* 中间：时间轴节点 */}
+                  <span class="timeline-axis__node" aria-hidden="true" />
+
+                  {/* 右侧：月份索引网格 */}
+                  <ol class="timeline-months" role="list">
+                    {yearNode.months.map((monthNode) => (
+                      <li class="timeline-month">
+                        <a
+                          href={withBase(`/archive/${yearNode.year}/${monthNode.month}/`)}
+                          class="timeline-month__link"
+                        >
+                          <span class="timeline-month__number">{monthNode.month}</span>
+                          <span class="timeline-month__unit">月</span>
+                          <span class="timeline-month__abbr">{monthAbbr[monthNode.month] ?? ''}</span>
+                          <span class="timeline-month__count">{monthNode.count} 篇</span>
+                        </a>
+                      </li>
+                    ))}
+                  </ol>
+                </li>
+              ))}
+            </ol>
+          )
+        }
+      </section>
+
+      {/* ── 底部辅助信息 ── */}
       {
-        archiveTree.length === 0 ? (
-          <p class="empty-state">暂无已发布文章，归档将在文章发布后自动生成。</p>
-        ) : (
-          <div class="archive-tree">
-            {archiveTree.map((yearNode) => (
-              <div class="archive-year">
-                <div class="archive-year__header">
-                  <a href={withBase(`/archive/${yearNode.year}/`)} class="archive-year__link">
-                    {yearNode.year} 年
-                  </a>
-                  <span class="archive-year__count">{yearNode.count} 篇</span>
-                </div>
-                <ul role="list" class="archive-months">
-                  {yearNode.months.map((monthNode) => (
-                    <li>
-                      <a href={withBase(`/archive/${yearNode.year}/${monthNode.month}/`)} class="archive-month__link">
-                        <span class="archive-month__name">{monthNames[monthNode.month] ?? monthNode.month}</span>
-                        <span class="archive-month__count">{monthNode.count}</span>
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
+        archiveTree.length > 0 && (
+          <div class="timeline-foot" aria-hidden="true">
+            <span>AN ARCHIVE OF SCIENTIFIC PROGRESS</span>
+            <span>{yearRange}</span>
           </div>
         )
       }
-    </section>
+    </div>
   </Container>
 </BaseLayout>
 
 <style>
-  .archive-tree {
+  /* ═══════════════════════════════════════════════
+   * 页面骨架
+   * ═══════════════════════════════════════════════ */
+  .timeline-page {
+    padding-block: 1.35rem var(--space-3xl);
+  }
+
+  /* ── 顶部 masthead（与 topics 页统一） ── */
+  .timeline-masthead {
     display: flex;
-    flex-direction: column;
-    gap: var(--space-xl);
-  }
-
-  .archive-year__header {
-    display: flex;
-    align-items: baseline;
-    gap: var(--space-sm);
-    padding-bottom: var(--space-sm);
-    border-bottom: 2px solid var(--color-brand-border);
-    margin-bottom: var(--space-md);
-  }
-
-  .archive-year__link {
-    font-size: var(--fs-lg);
-    font-weight: var(--fw-semibold);
-    color: var(--color-heading);
-    text-decoration: none;
-  }
-
-  .archive-year__link:hover {
-    color: var(--color-brand);
-  }
-
-  .archive-year__count {
-    font-size: var(--fs-sm);
-    color: var(--color-text-muted);
-  }
-
-  .archive-months {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-sm);
-    list-style: none;
-    padding: 0;
-    margin: 0;
-  }
-
-  .archive-month__link {
-    display: inline-flex;
     align-items: center;
-    gap: var(--space-xs);
-    padding: var(--space-xs) var(--space-md);
-    background-color: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-pill);
-    text-decoration: none;
-    transition: border-color var(--transition-fast);
+    justify-content: space-between;
+    gap: var(--space-lg);
+    padding-bottom: 0.9rem;
+    border-bottom: 1px solid var(--color-border);
+    color: #918ca3;
+    font-size: 0.65rem;
+    font-weight: var(--fw-medium);
+    letter-spacing: 0.17em;
+    line-height: 1.4;
   }
 
-  .archive-month__link:hover {
-    border-color: var(--color-brand-border);
-    background-color: var(--color-brand-soft);
+  /* ── 栏目介绍区 ── */
+  .timeline-intro {
+    padding-top: 2.4rem;
   }
 
-  .archive-month__name {
-    color: var(--color-text);
+  .timeline-intro__section {
+    margin: 0 0 1.25rem;
+    color: var(--color-brand);
+    font-size: 0.68rem;
+    font-weight: var(--fw-medium);
+    letter-spacing: 0.13em;
+  }
+
+  .timeline-intro__title {
+    margin: 0;
+    font-size: clamp(2.5rem, 4vw, 2.75rem);
+    font-weight: var(--fw-semibold);
+    letter-spacing: -0.055em;
+    line-height: 1.12;
+    color: var(--color-heading);
+  }
+
+  .timeline-intro__desc {
+    margin: 0.85rem 0 0;
+    color: var(--color-text-muted);
     font-size: var(--fs-sm);
+    line-height: 1.75;
   }
 
-  .archive-month__count {
+  .timeline-intro__rule {
+    display: block;
+    width: 1.9rem;
+    height: 2px;
+    margin-top: 1.7rem;
+    background: var(--color-brand);
+  }
+
+  /* ═══════════════════════════════════════════════
+   * 主体：纵向年份时间轴
+   * 桌面三栏：[年份 25%-28%] [时间轴 1px] [月份网格 剩余]
+   * ═══════════════════════════════════════════════ */
+  .timeline-body {
+    margin-top: 2.7rem;
+  }
+
+  .timeline {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* 单个年份区段：三栏 grid */
+  .timeline-year {
+    display: grid;
+    grid-template-columns:
+      minmax(9rem, 0.26fr)   /* 左：年份区域 */
+      1.5rem                  /* 中：时间轴通道 */
+      minmax(0, 1fr);         /* 右：月份网格 */
+    column-gap: clamp(1.5rem, 3vw, 2.5rem);
+    align-items: start;
+    position: relative;
+  }
+
+  /* 年份区段之间的纵向间距 */
+  .timeline-year + .timeline-year {
+    margin-top: 3.5rem;
+  }
+
+  /* ── 左侧：年份区域 ── */
+  .timeline-year__head {
+    padding-top: 0.1rem;
+  }
+
+  .timeline-year__link {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+    outline: none;
+  }
+
+  .timeline-year__label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: var(--color-text-muted);
+    font-size: 0.62rem;
+    font-weight: var(--fw-medium);
+    letter-spacing: 0.13em;
+    line-height: 1.2;
+  }
+
+  .timeline-year__number {
+    display: block;
+    color: var(--color-heading);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: clamp(3rem, 4.5vw, 3.75rem);
+    font-weight: 300;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.06em;
+    line-height: 1;
+    transition: color 200ms ease;
+  }
+
+  .timeline-year__count {
+    display: block;
+    margin-top: 0.7rem;
+    color: var(--color-text-muted);
     font-size: var(--fs-xs);
-    color: var(--color-text-muted);
-    background-color: var(--color-surface-alt);
-    padding: 0 var(--space-xs);
-    border-radius: var(--radius-sm);
+    letter-spacing: 0.02em;
   }
 
-  .empty-state {
-    padding: var(--space-2xl);
-    text-align: center;
+  /* ── 中间：时间轴（连续竖线 + 节点） ──
+   * 轴元素占满整个 grid 行高（align-self: stretch），中央一条 1px 竖线。
+   * 节点用 ::after 圆点定位在竖线上方，与年份大数字中心对齐。
+   * 相邻年份区段的竖线自动衔接（上区段底边 = 下区段顶边）。
+   * 首年份的竖线从节点位置开始（用上半段遮罩避免向上超出）。
+   */
+  .timeline-axis__node {
+    grid-column: 2;
+    position: relative;
+    width: 1px;
+    justify-self: center;
+    align-self: stretch;
+    background-color: var(--color-border-strong);
+    transition: background-color 200ms ease;
+  }
+
+  /* 首年份：上半段（节点以上）用页面背景色遮盖，竖线从节点开始 */
+  .timeline-year[data-year-index='0'] .timeline-axis__node::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 1.6rem;
+    background-color: var(--color-bg);
+  }
+
+  /* 圆形节点：定位在竖线上方，与年份大数字中心对齐 */
+  .timeline-axis__node::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 1.6rem;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--color-border-strong);
+    border: 2px solid var(--color-bg);
+    box-shadow: 0 0 0 1px var(--color-border-strong);
+    transform: translateX(-50%);
+    transition: background 200ms ease, box-shadow 200ms ease;
+    z-index: 1;
+  }
+
+  /* 最新年份（第一个）节点突出：品牌紫 */
+  .timeline-year[data-year-index='0'] .timeline-axis__node::after {
+    width: 11px;
+    height: 11px;
+    background: var(--color-brand);
+    box-shadow: 0 0 0 1px var(--color-brand-border);
+  }
+
+  /* ── 右侧：月份索引网格 ── */
+  .timeline-months {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    column-gap: clamp(1.25rem, 2.5vw, 2rem);
+    row-gap: 0;
+  }
+
+  .timeline-month {
+    min-width: 0;
+  }
+
+  .timeline-month__link {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto auto 1fr auto;
+    align-items: baseline;
+    gap: 0.35rem;
+    padding-block: 0.85rem 0.95rem;
+    border-bottom: 1px solid var(--color-border);
+    text-decoration: none;
+    color: inherit;
+    outline: none;
+    min-height: 3.2rem;
+  }
+
+  /* 悬停时底部下划线从左向右延伸 */
+  .timeline-month__link::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    bottom: -1px;
+    left: 0;
+    height: 1px;
+    background: var(--color-brand);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 200ms ease;
+  }
+
+  .timeline-month__number {
+    color: var(--color-heading);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: clamp(1.625rem, 2.5vw, 2rem);
+    font-weight: 300;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    transition: color 200ms ease;
+  }
+
+  .timeline-month__unit {
     color: var(--color-text-muted);
-    background-color: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
+    font-size: 0.7rem;
+    align-self: end;
+    padding-bottom: 0.15rem;
+  }
+
+  .timeline-month__abbr {
+    color: #9a95a7;
+    font-size: 0.68rem;
+    font-weight: var(--fw-medium);
+    letter-spacing: 0.1em;
+    align-self: end;
+    padding-bottom: 0.15rem;
+  }
+
+  .timeline-month__count {
+    color: #8b8699;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.68rem;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    align-self: end;
+    padding-bottom: 0.15rem;
+    transition: color 200ms ease;
+  }
+
+  /* ── 悬停 / 聚焦交互 ── */
+  /* 年份：文字变品牌紫，节点加深 */
+  .timeline-year__link:hover .timeline-year__number,
+  .timeline-year__link:focus-visible .timeline-year__number {
+    color: var(--color-brand-strong);
+  }
+
+  .timeline-year__link:focus-visible {
+    box-shadow: 0 0 0 2px var(--color-brand-soft);
+    border-radius: 2px;
+  }
+
+  .timeline-year__link:hover ~ .timeline-axis__node,
+  .timeline-year:hover .timeline-axis__node,
+  .timeline-year:focus-within .timeline-axis__node {
+    background: var(--color-brand-border);
+  }
+
+  /* 月份：数字变品牌紫，下划线延伸，文章数加深 */
+  .timeline-month__link:hover::after,
+  .timeline-month__link:focus-visible::after {
+    transform: scaleX(1);
+  }
+
+  .timeline-month__link:hover .timeline-month__number,
+  .timeline-month__link:focus-visible .timeline-month__number {
+    color: var(--color-brand-strong);
+  }
+
+  .timeline-month__link:hover .timeline-month__count,
+  .timeline-month__link:focus-visible .timeline-month__count {
+    color: var(--color-text);
+  }
+
+  .timeline-month__link:focus-visible {
+    box-shadow: 0 0 0 2px var(--color-brand-soft);
+  }
+
+  /* ═══════════════════════════════════════════════
+   * 底部辅助信息
+   * ═══════════════════════════════════════════════ */
+  .timeline-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-lg);
+    margin-top: 2.5rem;
+    padding-top: 0.8rem;
+    border-top: 1px solid var(--color-border);
+    color: #9a95a7;
+    font-size: 0.62rem;
+    font-weight: var(--fw-medium);
+    letter-spacing: 0.1em;
+  }
+
+  /* ═══════════════════════════════════════════════
+   * 空状态
+   * ═══════════════════════════════════════════════ */
+  .empty-state {
+    margin: 0;
+    padding-block: 3rem;
+    color: var(--color-text-muted);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  /* ═══════════════════════════════════════════════
+   * 响应式：平板（≤960px）
+   * 年份区域缩窄，月份网格改两栏
+   * ═══════════════════════════════════════════════ */
+  @media (max-width: 960px) {
+    .timeline-year {
+      grid-template-columns:
+        minmax(6.5rem, 0.22fr)
+        1.5rem
+        minmax(0, 1fr);
+      column-gap: 1.25rem;
+    }
+
+    .timeline-months {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      column-gap: 1.5rem;
+    }
+
+    .timeline-intro {
+      padding-top: 1.8rem;
+    }
+
+    .timeline-body {
+      margin-top: 2rem;
+    }
+
+    .timeline-year + .timeline-year {
+      margin-top: 3rem;
+    }
+
+    .timeline-year__number {
+      font-size: clamp(2.5rem, 5vw, 3rem);
+    }
+  }
+
+  /* ═══════════════════════════════════════════════
+   * 响应式：手机（≤620px）
+   * 紧凑纵向时间轴，时间轴在左侧，月份两栏
+   * ═══════════════════════════════════════════════ */
+  @media (max-width: 620px) {
+    .timeline-page {
+      padding-top: 1rem;
+    }
+
+    .timeline-masthead {
+      align-items: flex-start;
+      font-size: 0.58rem;
+      letter-spacing: 0.12em;
+    }
+
+    .timeline-intro {
+      padding-top: 1.7rem;
+    }
+
+    .timeline-intro__title {
+      font-size: clamp(2rem, 6vw, 2.4rem);
+    }
+
+    .timeline-intro__rule {
+      margin-top: 1.4rem;
+    }
+
+    .timeline-body {
+      margin-top: 1.8rem;
+    }
+
+    /* 手机：年份在上、月份在下；时间轴通道缩窄 */
+    .timeline-year {
+      grid-template-columns:
+        2rem    /* 时间轴通道（移到最左） */
+        minmax(0, 1fr);  /* 内容区 */
+      column-gap: 0.9rem;
+    }
+
+    /* 年份区段 + 月份区段合并到右侧内容列 */
+    .timeline-year__head {
+      grid-column: 2;
+    }
+
+    .timeline-axis__node {
+      grid-column: 1;
+      grid-row: 1 / span 2;
+    }
+
+    .timeline-months {
+      grid-column: 2;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      column-gap: 1rem;
+      margin-top: 0.6rem;
+    }
+
+    /* 手机端节点位置上移，与紧凑年份对齐 */
+    .timeline-axis__node::after {
+      top: 0.8rem;
+    }
+
+    /* 手机端首年份遮罩高度同步调整 */
+    .timeline-year[data-year-index='0'] .timeline-axis__node::before {
+      height: 0.8rem;
+    }
+
+    .timeline-year__number {
+      font-size: clamp(2.25rem, 6vw, 2.75rem);
+    }
+
+    .timeline-year + .timeline-year {
+      margin-top: 2.5rem;
+    }
+
+    .timeline-foot {
+      align-items: flex-start;
+      font-size: 0.56rem;
+      letter-spacing: 0.09em;
+    }
+
+    .timeline-month__number {
+      font-size: 1.5rem;
+    }
+  }
+
+  /* 极窄屏：月份单栏，保证触控区域 */
+  @media (max-width: 380px) {
+    .timeline-months {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .timeline-month__link {
+      min-height: 2.8rem;
+    }
+  }
+
+  /* ═══════════════════════════════════════════════
+   * prefers-reduced-motion：禁用过渡动画
+   * 覆盖所有带过渡的元素（含链接本身，防止全局 a 过渡残留）
+   * ═══════════════════════════════════════════════ */
+  @media (prefers-reduced-motion: reduce) {
+    .timeline-year__link,
+    .timeline-year__number,
+    .timeline-axis__node,
+    .timeline-axis__node::after,
+    .timeline-month__link,
+    .timeline-month__link::after,
+    .timeline-month__number,
+    .timeline-month__count {
+      transition-duration: 0.01ms !important;
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+    }
   }
 </style>

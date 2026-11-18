@@ -1,83 +1,813 @@
 ---
 /**
- * 关于我们页 (/about/)
+ * 关于我们页 (/about/) — Editorial Accordion
  *
- * 展示项目定位、YatCC 品牌与微信公众号信息。
- * 仅呈现已确定的品牌信息，不编造统计数据。
+ * 现代杂志式四章折叠目录：
+ * - 01 ABOUT / 关于我们（默认展开）
+ * - 02 OUR FOCUS / 关注领域（HPC · AI · Science）
+ * - 03 OUR NETWORK / 相关平台（4 个团队网站链接）
+ * - 04 STAY CONNECTED / 关注我们（微信公众号 + 二维码）
+ *
+ * 设计语言与 topics/index.astro、archive/index.astro 统一：
+ * 浅紫白背景、深灰紫文字、克制的品牌紫强调、精确对齐、细分隔线。
+ *
+ * 折叠交互：原生 <details>/<summary> 语义 + 少量 JS 实现单展开。
+ * ClientRouter 兼容：脚本通过 astro:page-load 绑定，避免重复绑定。
  */
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import Container from '@/components/Container.astro';
-import Logo from '@/components/Logo.astro';
 import '@/styles/page.css';
-import { site } from '@/utils/site';
+import { withBase } from '@/utils/site';
+
+/** 团队相关平台（名称经实际抓取各站 <title> 核实） */
+const platforms = [
+  {
+    id: 'ol',
+    name: 'YatCC-OL',
+    domain: 'ol.yatcc.arcsysu.cn',
+    url: 'https://ol.yatcc.arcsysu.cn/',
+    desc: 'YatCC 在线平台',
+  },
+  {
+    id: 'ai',
+    name: 'YatCC AI',
+    domain: 'yatcc-ai.com',
+    url: 'https://yatcc-ai.com/',
+    desc: 'YatCC 人工智能站点',
+  },
+  {
+    id: 'hub',
+    name: 'YatCC AI Hub',
+    domain: 'portal.aihub.arcsysu.cn',
+    url: 'https://portal.aihub.arcsysu.cn/',
+    desc: 'YatCC AI Hub 中文门户',
+  },
+  {
+    id: 'docs',
+    name: 'YatCC 实验文档',
+    domain: 'docs.yatcc-ai.com',
+    url: 'https://docs.yatcc-ai.com/',
+    desc: 'YatCC 实验文档站',
+  },
+];
+
+/** 关注领域三方向 */
+const focusAreas = [
+  {
+    label: 'HPC',
+    name: '高性能计算',
+    desc: '关注超级计算、先进计算架构、算力基础设施与大规模科学计算。',
+  },
+  {
+    label: 'AI',
+    name: '人工智能与科学智能',
+    desc: '关注人工智能技术、基础模型以及智能方法在科学研究中的应用。',
+  },
+  {
+    label: 'SCIENCE',
+    name: '全球科学前沿',
+    desc: '关注全球科研进展、科学发现及计算与智能技术推动的跨学科创新。',
+  },
+];
 ---
 
-<BaseLayout title="关于我们">
+<BaseLayout
+  title="关于我们"
+  description="以全球视野，看见科学的下一步。超智全球视野 — HPC + AI for Science 前沿观察平台。"
+>
   <Container>
-    <section class="page-header">
-      <h1 class="page-header__title">关于我们</h1>
-      <p class="page-header__subtitle">
-        了解 {site.name} 的项目定位、团队与发布渠道。
-      </p>
-    </section>
-
-    <section class="stack about">
-      <!-- 项目定位 -->
-      <div class="placeholder-card">
-        <h2 class="placeholder-card__title">项目定位</h2>
-        <p class="placeholder-card__body">
-          {site.name} 是 {site.team} 团队围绕 <strong>{site.direction}</strong>
-          前沿观察计划建设的科技信息展示平台，同时配套运营同名微信公众号。网站以内容优先的静态博客形式，持续追踪并呈现 HPC 与 AI for Science 领域的全球动态。
-        </p>
-        <p class="placeholder-card__body">
-          <strong>核心原则：</strong>由 AI Agent 定期收集领域信息并生成文章，经过格式校验与必要的人工审核后，网站自动读取 Markdown 文章并完成分类、排版与展示。同一批文章亦用于微信公众号发布。
-        </p>
+    <div class="about-page">
+      {/* ── 顶部 masthead（与 topics/archive 统一） ── */}
+      <div class="about-masthead" aria-hidden="true">
+        <span>CHAOZHI / ABOUT</span>
+        <span>HPC · AI · SCIENCE</span>
       </div>
 
-      <!-- YatCC 品牌 -->
-      <div class="placeholder-card">
-        <h2 class="placeholder-card__title">YatCC 品牌</h2>
-        <div class="about__brand">
-          <Logo size={48} />
-          <div class="about__brand-text">
-            <p class="placeholder-card__body">
-              本网站属于 <strong>{site.team}</strong> 团队。YatCC
-              原始 Logo（紫色龙形图案及字标）目前仍在准备中，当前导航栏使用简洁的「Y」字母图标作为占位，正式 Logo 资源就绪后将直接替换。
-            </p>
+      {/* ── 栏目介绍区 ── */}
+      <header class="about-intro">
+        <p class="about-intro__section">ABOUT / 01</p>
+        <h1 class="about-intro__title">关于我们</h1>
+        <p class="about-intro__desc">以全球视野，看见科学的下一步。</p>
+      </header>
+
+      <span class="about-intro__rule" aria-hidden="true"></span>
+
+      {/* ── 四章式折叠目录 ── */}
+      <section class="accordion" aria-label="项目介绍目录" data-accordion>
+        {/* 01 ABOUT — 默认展开 */}
+        <details class="chapter" data-chapter-index="0" open>
+          <summary class="chapter__head">
+            <span class="chapter__number" aria-hidden="true">01</span>
+            <div class="chapter__heading">
+              <span class="chapter__en">ABOUT</span>
+              <span class="chapter__title">关于我们</span>
+              <span class="chapter__summary">项目介绍与理念</span>
+            </div>
+            <span class="chapter__icon" aria-hidden="true"></span>
+          </summary>
+          <div class="chapter__body">
+            <div class="chapter__content">
+              <h2 class="chapter__lead">以全球视野，看见科学的下一步。</h2>
+              <p>
+                「超智全球视野」是围绕 HPC + AI for Science 前沿观察计划建设的科技内容平台，关注全球高性能计算、人工智能与科学研究的交叉发展。
+              </p>
+              <p>
+                我们希望通过持续追踪和整理全球科技进展，将前沿技术、科研趋势与科学发现呈现为清晰、可阅读、可追溯的观察记录，为关注计算与科学交叉领域的读者提供了解前沿的窗口。
+              </p>
+            </div>
           </div>
-        </div>
-      </div>
+        </details>
 
-      <!-- 发布渠道 -->
-      <div class="placeholder-card">
-        <h2 class="placeholder-card__title">发布渠道</h2>
-        <p class="placeholder-card__body">
-          本网站与微信公众号「<strong>{site.wechatAccount}</strong>」同步发布观察成果。文章由同一套 Markdown 内容驱动，确保跨渠道内容一致。
-        </p>
-        <p class="placeholder-card__note">
-          网站当前处于开发阶段，正式内容发布将在后续阶段启动。
-        </p>
-      </div>
-    </section>
+        {/* 02 OUR FOCUS */}
+        <details class="chapter" data-chapter-index="1">
+          <summary class="chapter__head">
+            <span class="chapter__number" aria-hidden="true">02</span>
+            <div class="chapter__heading">
+              <span class="chapter__en">OUR FOCUS</span>
+              <span class="chapter__title">关注领域</span>
+              <span class="chapter__summary">HPC · AI · Science</span>
+            </div>
+            <span class="chapter__icon" aria-hidden="true"></span>
+          </summary>
+          <div class="chapter__body">
+            <div class="chapter__content">
+              <ul class="focus-list" role="list">
+                {focusAreas.map((area) => (
+                  <li class="focus-item">
+                    <div class="focus-item__head">
+                      <span class="focus-item__label">{area.label}</span>
+                      <span class="focus-item__sep" aria-hidden="true">/</span>
+                      <span class="focus-item__name">{area.name}</span>
+                    </div>
+                    <p class="focus-item__desc">{area.desc}</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </details>
+
+        {/* 03 OUR NETWORK */}
+        <details class="chapter" data-chapter-index="2">
+          <summary class="chapter__head">
+            <span class="chapter__number" aria-hidden="true">03</span>
+            <div class="chapter__heading">
+              <span class="chapter__en">OUR NETWORK</span>
+              <span class="chapter__title">相关平台</span>
+              <span class="chapter__summary">探索团队的其他网站</span>
+            </div>
+            <span class="chapter__icon" aria-hidden="true"></span>
+          </summary>
+          <div class="chapter__body">
+            <div class="chapter__content">
+              <ul class="network-list" role="list">
+                {platforms.map((p, i) => (
+                  <li class="network-item">
+                    <a
+                      class="network-item__link"
+                      href={p.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <span class="network-item__number">{String(i + 1).padStart(2, '0')}</span>
+                      <div class="network-item__body">
+                        <span class="network-item__name">{p.name}</span>
+                        <span class="network-item__domain">{p.domain}</span>
+                      </div>
+                      <span class="network-item__arrow" aria-hidden="true">↗</span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </details>
+
+        {/* 04 STAY CONNECTED */}
+        <details class="chapter" data-chapter-index="3">
+          <summary class="chapter__head">
+            <span class="chapter__number" aria-hidden="true">04</span>
+            <div class="chapter__heading">
+              <span class="chapter__en">STAY CONNECTED</span>
+              <span class="chapter__title">关注我们</span>
+              <span class="chapter__summary">微信公众号</span>
+            </div>
+            <span class="chapter__icon" aria-hidden="true"></span>
+          </summary>
+          <div class="chapter__body">
+            <div class="chapter__content">
+              <div class="connect">
+                <div class="connect__text">
+                  <p class="connect__name">超智全球视野</p>
+                  <p class="connect__desc">
+                    关注「超智全球视野」微信公众号，获取高性能计算、科学智能与全球科研前沿的最新观察。
+                  </p>
+                  <p class="connect__hint">微信扫码关注</p>
+                </div>
+                <div class="connect__qr">
+                  <img
+                    src={withBase('/QRcode.jpeg')}
+                    alt="超智全球视野微信公众号二维码"
+                    width="430"
+                    height="430"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </details>
+      </section>
+    </div>
   </Container>
 </BaseLayout>
 
+<script>
+  /**
+   * 折叠交互：单展开模式
+   *
+   * - 点击展开某章节时，自动收起其他章节。
+   * - 再次点击当前展开章节可收起（此时允许全部收起，不强制保持一个展开）。
+   * - 默认第一章展开（HTML 中已设 open 属性作为基线）。
+   *
+   * ClientRouter 兼容：通过 astro:page-load 绑定，
+   * 每次页面加载（含站内导航）后重新初始化，避免事件重复绑定。
+   * 用 astro:before-swap 在离开页面前清理监听器。
+   */
+  function initAccordion(): void {
+    const accordion = document.querySelector<HTMLElement>('[data-accordion]');
+    if (!accordion) return;
+
+    // 标记已初始化，防止同一实例重复绑定
+    if (accordion.dataset.initialized === 'true') return;
+    accordion.dataset.initialized = 'true';
+
+    const chapters = accordion.querySelectorAll<HTMLDetailsElement>('.chapter');
+
+    chapters.forEach((chapter) => {
+      chapter.addEventListener('toggle', () => {
+        // 仅在「展开」时触发收起其他章节
+        if (chapter.open) {
+          chapters.forEach((other) => {
+            if (other !== chapter && other.open) {
+              other.open = false;
+            }
+          });
+        }
+      });
+    });
+  }
+
+  // astro:page-load：首次加载 + 每次 ClientRouter 站内导航后触发
+  document.addEventListener('astro:page-load', initAccordion);
+</script>
+
 <style>
-  .about__brand {
+  /* ═══════════════════════════════════════════════
+   * 页面骨架
+   * ═══════════════════════════════════════════════ */
+  .about-page {
+    padding-block: 1.35rem var(--space-3xl);
+  }
+
+  /* ── 顶部 masthead（与 topics/archive 统一） ── */
+  .about-masthead {
     display: flex;
-    align-items: flex-start;
-    gap: var(--space-md);
-    margin-top: var(--space-md);
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-lg);
+    padding-bottom: 0.9rem;
+    border-bottom: 1px solid var(--color-border);
+    color: #918ca3;
+    font-size: 0.65rem;
+    font-weight: var(--fw-medium);
+    letter-spacing: 0.17em;
+    line-height: 1.4;
   }
 
-  .about__brand-text {
-    flex: 1;
+  /* ── 栏目介绍区 ── */
+  .about-intro {
+    padding-top: 2.4rem;
   }
 
-  @media (max-width: 768px) {
-    .about__brand {
-      flex-direction: column;
-      gap: var(--space-sm);
+  .about-intro__section {
+    margin: 0 0 1.25rem;
+    color: var(--color-brand);
+    font-size: 0.68rem;
+    font-weight: var(--fw-medium);
+    letter-spacing: 0.13em;
+  }
+
+  .about-intro__title {
+    margin: 0;
+    font-size: clamp(2.5rem, 4vw, 2.75rem);
+    font-weight: var(--fw-semibold);
+    letter-spacing: -0.055em;
+    line-height: 1.12;
+    color: var(--color-heading);
+  }
+
+  .about-intro__desc {
+    margin: 0.85rem 0 0;
+    color: var(--color-text-muted);
+    font-size: var(--fs-md);
+    line-height: 1.75;
+  }
+
+  .about-intro__rule {
+    display: block;
+    width: 1.9rem;
+    height: 2px;
+    margin-top: 1.7rem;
+    background: var(--color-brand);
+  }
+
+  /* ═══════════════════════════════════════════════
+   * 四章式折叠目录
+   * ═══════════════════════════════════════════════ */
+  .accordion {
+    margin-top: 1.5rem;
+    border-top: 1px solid var(--color-border-strong);
+  }
+
+  .chapter {
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  /* 隐藏原生三角标记 */
+  .chapter > summary {
+    list-style: none;
+  }
+  .chapter > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  /* 章节标题行：编号 | 标题区 | 图标 */
+  .chapter__head {
+    display: grid;
+    grid-template-columns: 3.5rem minmax(0, 1fr) 2rem;
+    align-items: center;
+    column-gap: clamp(1rem, 2.5vw, 1.75rem);
+    padding-block: clamp(1.4rem, 2.2vw, 1.7rem);
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 200ms ease;
+  }
+
+  .chapter__head:hover {
+    background-color: rgba(109, 74, 255, 0.02);
+  }
+
+  .chapter__head:focus-visible {
+    outline: 2px solid var(--color-brand-soft);
+    outline-offset: -2px;
+  }
+
+  /* 大字号编号 */
+  .chapter__number {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: clamp(2rem, 3vw, 2.5rem);
+    font-weight: 300;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.04em;
+    line-height: 1;
+    color: var(--color-border-strong);
+    transition: color 220ms ease;
+  }
+
+  .chapter[open] .chapter__number {
+    color: var(--color-brand);
+  }
+
+  /* 标题区 */
+  .chapter__heading {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    min-width: 0;
+  }
+
+  .chapter__en {
+    font-size: 0.62rem;
+    font-weight: var(--fw-medium);
+    letter-spacing: 0.15em;
+    color: #918ca3;
+    line-height: 1.2;
+  }
+
+  .chapter__title {
+    font-size: clamp(1.375rem, 2vw, 1.625rem);
+    font-weight: var(--fw-semibold);
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+    color: var(--color-heading);
+    transition: color 220ms ease;
+  }
+
+  .chapter__head:hover .chapter__title {
+    color: var(--color-brand-strong);
+  }
+
+  .chapter__summary {
+    font-size: var(--fs-xs);
+    color: var(--color-text-muted);
+    line-height: 1.4;
+  }
+
+  /* + / − 图标 */
+  .chapter__icon {
+    position: relative;
+    width: 2rem;
+    height: 2rem;
+    justify-self: end;
+  }
+
+  .chapter__icon::before,
+  .chapter__icon::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    background: var(--color-text-muted);
+    transition: transform 240ms ease, background 240ms ease;
+  }
+
+  /* 横线 */
+  .chapter__icon::before {
+    width: 14px;
+    height: 1.5px;
+    transform: translate(-50%, -50%);
+  }
+
+  /* 竖线（收起态显示为 +） */
+  .chapter__icon::after {
+    width: 1.5px;
+    height: 14px;
+    transform: translate(-50%, -50%);
+  }
+
+  /* 展开态：竖线旋转消失，变为 − */
+  .chapter[open] .chapter__icon::after {
+    transform: translate(-50%, -50%) rotate(90deg);
+    opacity: 0;
+  }
+
+  .chapter[open] .chapter__icon::before,
+  .chapter[open] .chapter__icon::after {
+    background: var(--color-brand);
+  }
+
+  .chapter__head:hover .chapter__icon::before,
+  .chapter__head:hover .chapter__icon::after {
+    background: var(--color-brand-strong);
+  }
+
+  /* ── 展开内容区 ── */
+  .chapter__body {
+    overflow: hidden;
+  }
+
+  .chapter__content {
+    max-width: 42rem;
+    padding: 0.5rem 0 clamp(1.75rem, 2.5vw, 2.25rem) calc(3.5rem + clamp(1rem, 2.5vw, 1.75rem));
+    /* 用 grid-template-rows 实现展开/收起过渡 */
+  }
+
+  .chapter__lead {
+    margin: 0 0 1.1rem;
+    font-size: clamp(1.25rem, 2vw, 1.5rem);
+    font-weight: var(--fw-semibold);
+    letter-spacing: -0.02em;
+    line-height: 1.4;
+    color: var(--color-heading);
+  }
+
+  .chapter__content p {
+    margin: 0 0 1rem;
+    font-size: clamp(0.95rem, 1.1vw, 1.0625rem);
+    line-height: 1.8;
+    color: var(--color-text);
+  }
+
+  .chapter__content p:last-child {
+    margin-bottom: 0;
+  }
+
+  /* ── 02 关注领域列表 ── */
+  .focus-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .focus-item {
+    padding-block: 1.25rem;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .focus-item:first-child {
+    padding-top: 0;
+  }
+
+  .focus-item:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  .focus-item__head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .focus-item__label {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.8rem;
+    font-weight: var(--fw-medium);
+    letter-spacing: 0.06em;
+    color: var(--color-brand);
+  }
+
+  .focus-item__sep {
+    color: var(--color-border-strong);
+    font-size: 0.8rem;
+  }
+
+  .focus-item__name {
+    font-size: 1.125rem;
+    font-weight: var(--fw-semibold);
+    color: var(--color-heading);
+  }
+
+  .focus-item__desc {
+    margin: 0;
+    font-size: var(--fs-sm);
+    line-height: 1.75;
+    color: var(--color-text-muted);
+  }
+
+  /* ── 03 相关平台列表 ── */
+  .network-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .network-item {
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .network-item:last-child {
+    border-bottom: none;
+  }
+
+  .network-item__link {
+    display: grid;
+    grid-template-columns: 2.5rem minmax(0, 1fr) 1.5rem;
+    align-items: center;
+    column-gap: 1rem;
+    padding-block: 1.15rem;
+    text-decoration: none;
+    color: inherit;
+    outline: none;
+    transition: background-color 200ms ease;
+  }
+
+  .network-item__link:hover {
+    background-color: rgba(109, 74, 255, 0.02);
+  }
+
+  .network-item__link:focus-visible {
+    box-shadow: inset 0 0 0 2px var(--color-brand-soft);
+    border-radius: 2px;
+  }
+
+  .network-item__number {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-text-muted);
+    letter-spacing: 0.02em;
+  }
+
+  .network-item__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0;
+  }
+
+  .network-item__name {
+    font-size: 1.0625rem;
+    font-weight: var(--fw-semibold);
+    color: var(--color-heading);
+    transition: color 200ms ease;
+  }
+
+  .network-item__link:hover .network-item__name,
+  .network-item__link:focus-visible .network-item__name {
+    color: var(--color-brand-strong);
+  }
+
+  .network-item__domain {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.7rem;
+    color: #9a95a7;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .network-item__arrow {
+    font-size: 1rem;
+    color: var(--color-text-muted);
+    justify-self: end;
+    transition: transform 220ms ease, color 220ms ease;
+  }
+
+  .network-item__link:hover .network-item__arrow,
+  .network-item__link:focus-visible .network-item__arrow {
+    transform: translate(3px, -3px);
+    color: var(--color-brand);
+  }
+
+  /* ── 04 关注我们：文字 + 二维码双栏 ── */
+  .connect {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: clamp(2rem, 4vw, 3.5rem);
+  }
+
+  .connect__text {
+    min-width: 0;
+  }
+
+  .connect__name {
+    margin: 0 0 1rem;
+    font-size: clamp(1.375rem, 2vw, 1.625rem);
+    font-weight: var(--fw-semibold);
+    letter-spacing: -0.02em;
+    color: var(--color-heading);
+  }
+
+  .connect__desc {
+    margin: 0 0 1.25rem;
+    font-size: clamp(0.95rem, 1.1vw, 1.0625rem);
+    line-height: 1.8;
+    color: var(--color-text);
+  }
+
+  .connect__hint {
+    margin: 0;
+    font-size: 0.7rem;
+    font-weight: var(--fw-medium);
+    letter-spacing: 0.1em;
+    color: var(--color-text-muted);
+  }
+
+  .connect__qr {
+    flex-shrink: 0;
+  }
+
+  .connect__qr img {
+    display: block;
+    width: clamp(150px, 12vw, 180px);
+    height: auto;
+    aspect-ratio: 1 / 1;
+    padding: 10px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+  }
+
+  /* ═══════════════════════════════════════════════
+   * 响应式：平板（≤960px）
+   * ═══════════════════════════════════════════════ */
+  @media (max-width: 960px) {
+    .about-intro {
+      padding-top: 1.8rem;
+    }
+
+    .chapter__head {
+      grid-template-columns: 2.8rem minmax(0, 1fr) 1.75rem;
+      column-gap: 1rem;
+    }
+
+    .chapter__content {
+      padding-left: calc(2.8rem + 1rem);
+    }
+  }
+
+  /* ═══════════════════════════════════════════════
+   * 响应式：手机（≤620px）
+   * ═══════════════════════════════════════════════ */
+  @media (max-width: 620px) {
+    .about-page {
+      padding-top: 1rem;
+    }
+
+    .about-masthead {
+      align-items: flex-start;
+      font-size: 0.58rem;
+      letter-spacing: 0.12em;
+    }
+
+    .about-intro {
+      padding-top: 1.7rem;
+    }
+
+    .about-intro__title {
+      font-size: clamp(2rem, 6vw, 2.4rem);
+    }
+
+    .about-intro__rule {
+      margin-top: 1.4rem;
+    }
+
+    .accordion {
+      margin-top: 1.2rem;
+    }
+
+    .chapter__head {
+      grid-template-columns: 2.2rem minmax(0, 1fr) 1.5rem;
+      column-gap: 0.75rem;
+      padding-block: 1.25rem;
+      min-height: 3rem;
+    }
+
+    .chapter__number {
+      font-size: 1.5rem;
+    }
+
+    .chapter__title {
+      font-size: 1.125rem;
+    }
+
+    .chapter__summary {
+      font-size: 0.68rem;
+    }
+
+    .chapter__content {
+      padding-left: calc(2.2rem + 0.75rem);
+      padding-bottom: 1.75rem;
+    }
+
+    .chapter__lead {
+      font-size: 1.125rem;
+    }
+
+    /* 关注我们：纵向排列，二维码在下方 */
+    .connect {
+      grid-template-columns: minmax(0, 1fr);
+      column-gap: 0;
+      row-gap: 1.5rem;
+    }
+
+    .connect__qr img {
+      width: 150px;
+    }
+
+    /* 相关平台：编号 + 名称 + 域名 + 箭头不重叠 */
+    .network-item__link {
+      grid-template-columns: 2rem minmax(0, 1fr) 1.25rem;
+      column-gap: 0.75rem;
+      padding-block: 1rem;
+    }
+  }
+
+  /* 极窄屏 */
+  @media (max-width: 380px) {
+    .chapter__head {
+      grid-template-columns: 2rem minmax(0, 1fr) 1.25rem;
+      column-gap: 0.6rem;
+    }
+
+    .chapter__content {
+      padding-left: calc(2rem + 0.6rem);
+    }
+
+    .connect__qr img {
+      width: 130px;
+    }
+  }
+
+  /* ═══════════════════════════════════════════════
+   * prefers-reduced-motion：禁用过渡动画
+   * ═══════════════════════════════════════════════ */
+  @media (prefers-reduced-motion: reduce) {
+    .chapter__head,
+    .chapter__number,
+    .chapter__title,
+    .chapter__icon::before,
+    .chapter__icon::after,
+    .network-item__link,
+    .network-item__name,
+    .network-item__arrow {
+      transition-duration: 0.01ms !important;
+      animation-duration: 0.01ms !important;
     }
   }
 </style>

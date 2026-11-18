@@ -158,6 +158,9 @@ const isDemo = meta.isDemo ?? false;
    * 1. 为正文所有 <img> 添加 loading="lazy" + decoding="async"（懒加载、防布局偏移）
    * 2. 将带 title 属性的图片包裹为 <figure> + <figcaption>（图注）
    * 3. 大表格自动包裹 .table-wrapper（防溢出，窄屏可滚动）
+   *
+   * 生命周期：astro:page-load（每次页面加载后触发，含 ClientRouter 站内导航后）。
+   * 原 DOMContentLoaded 在客户端导航时不触发，会导致从首页/列表点进文章后图片未增强。
    */
   function enhanceArticleBody() {
     const body = document.getElementById('article-body');
@@ -198,25 +201,36 @@ const isDemo = meta.isDemo ?? false;
     });
   }
 
-  // DOM 解析完成后执行
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', enhanceArticleBody);
-  } else {
-    enhanceArticleBody();
-  }
+  // astro:page-load：每次页面加载后触发（含 ClientRouter 导航后进入文章页）。
+  document.addEventListener('astro:page-load', enhanceArticleBody);
 </script>
 
 <script>
   /**
    * 返回导航增强（返回上一页）：
-   * 优先使用 history.back() 恢复来源页面及滚动位置（依赖浏览器 bfcache 原生滚动恢复）。
-   * 仅当确认存在站内来源（document.referrer 同源 + history.length > 1）时才尝试 back()，
-   * 否则安全回退到首页（backHref）。另设 pagehide 超时兜底，防止 back() 无效时卡留当前页。
+   * 优先使用 history.back() 恢复来源页面及滚动位置。
+   *
+   * ClientRouter 兼容性说明：
+   * - history.back() 会触发 ClientRouter 的 popstate 处理，进行站内页面切换（不整页卸载）。
+   * - 原实现依赖 document.referrer 判断站内来源 + pagehide 超时兜底。
+   *   但客户端导航下 document.referrer 不更新（始终为首屏来源），且 pagehide 不触发，
+   *   导致超时兜底误判 back() 失败 → 500ms 后整页跳转 fallbackHref，破坏导航体验。
+   *
+   * 改进：
+   * - 站内来源判断改为 history.length > 1（标签页有历史可回退即可），
+   *   不再依赖 document.referrer（客户端导航下不可靠）。
+   * - 移除 pagehide 超时兜底：ClientRouter 下 back() 必然触发 popstate 页面切换，
+   *   无需兜底；若 back() 真无效（如直接打开文章无历史），则 fallbackHref 整页跳转。
+   * - 用 astro:page-load 初始化，避免重复绑定（每次导航后重新查询当前页的返回链接）。
    * 不影响浏览器原生后退/前进按钮、文章末尾"下一篇文章"导航。
    */
   function initBackNav() {
     const link = document.querySelector('[data-back-nav]') as HTMLAnchorElement | null;
     if (!link) return;
+
+    // 避免同一链接重复绑定（astro:page-load 每次导航后都会查询）
+    if (link.dataset.backNavBound === 'true') return;
+    link.dataset.backNavBound = 'true';
 
     const fallbackHref = link.getAttribute('data-back-href') || '/';
 
@@ -226,43 +240,26 @@ const isDemo = meta.isDemo ?? false;
 
       e.preventDefault();
 
-      // 判断是否有可靠的站内来源页面：
-      // 1. document.referrer 同源 → 来源是站内页面（排除外部链接/书签/直接打开）
-      // 2. history.length > 1 → 当前标签页有历史记录可回退（排除新标签页打开）
-      let hasInSiteSource = false;
-      try {
-        if (document.referrer) {
-          const refUrl = new URL(document.referrer, window.location.href);
-          hasInSiteSource = refUrl.origin === window.location.origin;
-        }
-      } catch (_) {
-        hasInSiteSource = false;
-      }
+      // 判断是否有可回退的历史记录（标签页有历史即可 back）
       const hasHistory = window.history.length > 1;
 
-      if (!hasInSiteSource || !hasHistory) {
-        // 无可靠站内历史：安全回退首页
+      if (!hasHistory) {
+        // 无历史（如直接打开文章标签页）：安全回退首页
         window.location.href = fallbackHref;
         return;
       }
 
-      // 有站内来源且有历史：history.back() 恢复来源页面及滚动位置
-      // pagehide 超时兜底：若 back() 未触发页面卸载（极端边界），回退首页
-      let unloaded = false;
-      window.addEventListener('pagehide', () => { unloaded = true; }, { once: true });
-      window.setTimeout(() => {
-        if (!unloaded) window.location.href = fallbackHref;
-      }, 500);
-
+      // 有历史：history.back() 恢复来源页面。
+      // ClientRouter 下 back() 触发 popstate → 站内页面切换，不整页卸载。
+      // 注：persist 的 Header 中的返回链接会随导航更新 data-back-nav-bound 标记，
+      // 但此处 dataset 标记在 persist 跨页面时可能残留——initBackNav 每次都会
+      // 重新查询当前页的 [data-back-nav]，新页面的链接是新的 DOM（非 persist），无影响。
       history.back();
     });
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initBackNav);
-  } else {
-    initBackNav();
-  }
+  // astro:page-load：每次页面加载后触发（含 ClientRouter 导航后）。
+  document.addEventListener('astro:page-load', initBackNav);
 </script>
 
 <style>

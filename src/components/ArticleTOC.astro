@@ -53,8 +53,21 @@ const tocHeadings = headings.filter((h) => h.depth === 2 || h.depth === 3);
 
 <script>
   // 滚动高亮当前章节（IntersectionObserver，无依赖）
-  const tocLinks = document.querySelectorAll<HTMLAnchorElement>('.article-toc__link');
-  if (tocLinks.length > 0) {
+  //
+  // ClientRouter 兼容性：原脚本在首次加载时执行一次，导航到另一篇文章时
+  // IntersectionObserver 仍观察旧标题元素（已分离），新文章的 TOC 不高亮。
+  // 现用 astro:page-load 在每次进入文章页时重新初始化，并在离开时断开旧 observer。
+
+  let tocObserver: IntersectionObserver | null = null;
+
+  function initArticleTOC(): void {
+    // 先断开上一轮 observer（离开文章页时 astro:before-swap 已断开，此处冗余兜底）
+    tocObserver?.disconnect();
+    tocObserver = null;
+
+    const tocLinks = document.querySelectorAll<HTMLAnchorElement>('.article-toc__link');
+    if (tocLinks.length === 0) return; // 非文章页或无目录
+
     const headingMap = new Map<string, HTMLAnchorElement>();
     tocLinks.forEach((link) => {
       const slug = link.dataset.tocSlug;
@@ -66,40 +79,57 @@ const tocHeadings = headings.filter((h) => h.depth === 2 || h.depth === 3);
       .map((slug) => document.getElementById(slug))
       .filter((el): el is HTMLElement => el !== null);
 
-    if (headingsToObserve.length > 0) {
-      let activeLink: HTMLAnchorElement | null = null;
+    if (headingsToObserve.length === 0) return;
 
-      const observer = new IntersectionObserver(
-        (entries) => {
-          // 找到最靠近视口顶部的可见标题
-          let topMost: { el: HTMLElement; top: number } | null = null;
-          for (const entry of entries) {
-            if (entry.isIntersecting) {
-              const top = entry.boundingClientRect.top;
-              if (!topMost || top < topMost.top) {
-                topMost = { el: entry.target as HTMLElement, top };
-              }
+    let activeLink: HTMLAnchorElement | null = null;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // 找到最靠近视口顶部的可见标题
+        let topMost: { el: HTMLElement; top: number } | null = null;
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            const top = entry.boundingClientRect.top;
+            if (!topMost || top < topMost.top) {
+              topMost = { el: entry.target as HTMLElement, top };
             }
           }
-          if (topMost) {
-            const slug = topMost.el.id;
-            const link = headingMap.get(slug);
-            if (link && link !== activeLink) {
-              activeLink?.classList.remove('is-active');
-              link.classList.add('is-active');
-              activeLink = link;
-            }
+        }
+        if (topMost) {
+          const slug = topMost.el.id;
+          const link = headingMap.get(slug);
+          if (link && link !== activeLink) {
+            activeLink?.classList.remove('is-active');
+            link.classList.add('is-active');
+            activeLink = link;
           }
-        },
-        {
-          // 根区域偏移：考虑固定阅读栏高度（约 80px）
-          rootMargin: '-100px 0px -70% 0px',
-          threshold: 0,
-        },
-      );
+        }
+      },
+      {
+        // 根区域偏移：考虑固定阅读栏高度（约 80px）
+        rootMargin: '-100px 0px -70% 0px',
+        threshold: 0,
+      },
+    );
 
-      headingsToObserve.forEach((el) => observer.observe(el));
-    }
+    headingsToObserve.forEach((el) => observer.observe(el));
+    tocObserver = observer;
+  }
+
+  // astro:before-swap：离开文章页前断开 observer，避免引用已分离 DOM。
+  document.addEventListener('astro:before-swap', () => {
+    tocObserver?.disconnect();
+    tocObserver = null;
+  });
+
+  // astro:page-load：每次页面加载后初始化（含 ClientRouter 导航后进入文章页）。
+  document.addEventListener('astro:page-load', initArticleTOC);
+
+  // 首次加载兜底（astro:page-load 在 ClientRouter 下会触发，此处兼容 SSR 直达）
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initArticleTOC, { once: true });
+  } else {
+    initArticleTOC();
   }
 </script>
 

@@ -67,66 +67,121 @@ const { title, backHref, backLabel } = Astro.props;
 <script>
   // ──────────────────────────────────────────────
   // Header ↔ 阅读栏切换 + 进度条更新
+  //
+  // ClientRouter 兼容性：
+  // - 原实现 document.body.classList.add('has-reading-bar') 在离开文章页时未移除，
+  //   导致 Header 的 150ms 展开延迟泄漏到非文章页。现用 astro:before-swap 清理。
+  // - IntersectionObserver / scroll / resize 监听在离开文章页时需断开/移除，
+  //   避免引用已分离 DOM 与监听累积。用 astro:page-load 在进入文章页时重新初始化。
   // ──────────────────────────────────────────────
 
-  const readingBar = document.getElementById('reading-bar');
-  const progressFill = document.getElementById('reading-progress-fill');
-  const articleTitle = document.querySelector<HTMLElement>('.article-head__title');
-  const articleBody = document.querySelector<HTMLElement>('.article-body');
+  // 模块作用域句柄：离开文章页时调用 cleanup 断开 observer + 移除监听 + 清 body 标记
+  let readingBarCleanup: (() => void) | null = null;
 
-  // 标记当前页有阅读栏，Header 展开延迟由此触发
-  document.body.classList.add('has-reading-bar');
+  function initReadingBar(): void {
+    // 先清理上一轮残留（若存在）
+    readingBarCleanup?.();
+    readingBarCleanup = null;
 
-  if (readingBar && articleTitle && articleBody) {
-    let barVisible = false;
-    let ticking = false;
+    const readingBar = document.getElementById('reading-bar');
+    const progressFill = document.getElementById('reading-progress-fill');
+    const articleTitle = document.querySelector<HTMLElement>('.article-head__title');
+    const articleBody = document.querySelector<HTMLElement>('.article-body');
 
-    // 用 IntersectionObserver 监测文章标题可见性
-    // 标题完全离开视口顶部时切换为阅读栏
-    const titleObserver = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          // 标题离开视口顶部（boundingClientRect.top < 0）时显示阅读栏
-          const shouldShow = !entry.isIntersecting && entry.boundingClientRect.top < 0;
-          if (shouldShow !== barVisible) {
-            barVisible = shouldShow;
-            // 阅读栏显示时，隐藏普通 Header（互斥）；阅读栏收回时，恢复 Header
-            document.body.setAttribute('data-header-hidden', String(shouldShow));
-            // 用 data 属性驱动 CSS transform 动画（不用 hidden 属性，避免 display:none 破坏过渡）
-            readingBar.setAttribute('data-visible', String(shouldShow));
-            readingBar.setAttribute('aria-hidden', String(!shouldShow));
+    // 非文章页：无阅读栏元素，移除可能残留的 body 标记后返回
+    if (!readingBar) {
+      document.body.classList.remove('has-reading-bar');
+      return;
+    }
+
+    // 标记当前页有阅读栏，Header 展开延迟由此触发
+    document.body.classList.add('has-reading-bar');
+
+    if (articleTitle && articleBody) {
+      let barVisible = false;
+      let ticking = false;
+
+      // 用 IntersectionObserver 监测文章标题可见性
+      // 标题完全离开视口顶部时切换为阅读栏
+      const titleObserver = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            // 标题离开视口顶部（boundingClientRect.top < 0）时显示阅读栏
+            const shouldShow = !entry.isIntersecting && entry.boundingClientRect.top < 0;
+            if (shouldShow !== barVisible) {
+              barVisible = shouldShow;
+              // 阅读栏显示时，隐藏普通 Header（互斥）；阅读栏收回时，恢复 Header
+              document.body.setAttribute('data-header-hidden', String(shouldShow));
+              // 用 data 属性驱动 CSS transform 动画（不用 hidden 属性，避免 display:none 破坏过渡）
+              readingBar.setAttribute('data-visible', String(shouldShow));
+              readingBar.setAttribute('aria-hidden', String(!shouldShow));
+            }
           }
-        }
-      },
-      { rootMargin: '0px', threshold: 0 },
-    );
-    titleObserver.observe(articleTitle);
+        },
+        { rootMargin: '0px', threshold: 0 },
+      );
+      titleObserver.observe(articleTitle);
 
-    // 计算并更新进度条
-    function updateProgress(): void {
-      if (!progressFill || !articleBody) return;
-      const rect = articleBody.getBoundingClientRect();
-      const viewportHeight = window.innerHeight;
-      // 正文顶部到视口顶部的距离（负数表示已滚入视口上方）
-      const scrolled = Math.max(0, -rect.top);
-      // 总可滚动距离 = 正文高度 - 视口高度
-      const totalScrollable = Math.max(1, rect.height - viewportHeight);
-      const progress = Math.min(1, Math.max(0, scrolled / totalScrollable));
-      progressFill.style.transform = `scaleX(${progress})`;
-      ticking = false;
-    }
-
-    function onScroll(): void {
-      if (!ticking) {
-        window.requestAnimationFrame(updateProgress);
-        ticking = true;
+      // 计算并更新进度条
+      function updateProgress(): void {
+        if (!progressFill || !articleBody) return;
+        const rect = articleBody.getBoundingClientRect();
+        const viewportHeight = window.innerHeight;
+        // 正文顶部到视口顶部的距离（负数表示已滚入视口上方）
+        const scrolled = Math.max(0, -rect.top);
+        // 总可滚动距离 = 正文高度 - 视口高度
+        const totalScrollable = Math.max(1, rect.height - viewportHeight);
+        const progress = Math.min(1, Math.max(0, scrolled / totalScrollable));
+        progressFill.style.transform = `scaleX(${progress})`;
+        ticking = false;
       }
-    }
 
-    // 初始更新一次
-    updateProgress();
-    window.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', updateProgress, { passive: true });
+      function onScroll(): void {
+        if (!ticking) {
+          window.requestAnimationFrame(updateProgress);
+          ticking = true;
+        }
+      }
+
+      // 初始更新一次
+      updateProgress();
+      window.addEventListener('scroll', onScroll, { passive: true });
+      window.addEventListener('resize', updateProgress, { passive: true });
+
+      // 注册清理：离开文章页时断开 observer + 移除监听 + 重置阅读栏可见状态
+      readingBarCleanup = () => {
+        titleObserver.disconnect();
+        window.removeEventListener('scroll', onScroll);
+        window.removeEventListener('resize', updateProgress);
+        // 重置阅读栏为隐藏，避免 persist Header 看到 150ms 延迟残留
+        readingBar.setAttribute('data-visible', 'false');
+        readingBar.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('has-reading-bar');
+      };
+    } else {
+      // 有 reading-bar 元素但缺 title/body：仍需清理 body 标记
+      readingBarCleanup = () => {
+        document.body.classList.remove('has-reading-bar');
+      };
+    }
+  }
+
+  // astro:before-swap：站内导航离开当前页前触发。
+  // 断开 observer + 移除监听 + 清 body.has-reading-bar，避免泄漏到非文章页。
+  document.addEventListener('astro:before-swap', () => {
+    readingBarCleanup?.();
+    readingBarCleanup = null;
+  });
+
+  // astro:page-load：每次页面加载后触发（含 ClientRouter 导航后）。
+  // 文章页：初始化阅读栏；非文章页：清理残留标记。
+  document.addEventListener('astro:page-load', initReadingBar);
+
+  // 首次加载兜底（astro:page-load 在 ClientRouter 下会触发，此处兼容 SSR 直达）
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initReadingBar, { once: true });
+  } else {
+    initReadingBar();
   }
 </script>
 

@@ -1,15 +1,4 @@
 ---
-/**
- * 主题页 (/topics/)
- *
- * 从已发布文章的 tags 字段自动汇总全部主题。
- * 对标签去重，统计每个主题的文章数量。
- * 主题按文章数量降序排列，同数量时按名称排序。
- * 点击主题，进入对应的文章合集页面。
- *
- * 主题名称可能包含中文、空格、+ 等字符，URL 编码处理。
- * 新文章出现新标签时，重新构建即可自动生成对应主题。
- */
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import Container from '@/components/Container.astro';
 import '@/styles/page.css';
@@ -19,85 +8,540 @@ import { withBase } from '@/utils/site';
 const tagStats = await getTagStats();
 ---
 
-<BaseLayout title="主题">
+<BaseLayout
+  title="探索主题"
+  description="从计算技术到科学发现，探索我们持续关注的前沿领域。"
+>
   <Container>
-    <section class="page-header">
-      <h1 class="page-header__title">主题</h1>
-      <p class="page-header__subtitle">
-        按主题合集浏览 HPC 与 AI for Science 领域的观察文章。主题由文章标签自动聚合生成，共 {tagStats.length} 个主题。
-      </p>
-    </section>
+    <div class="subject-page" data-subject-page>
+      <div class="subject-masthead" aria-hidden="true">
+        <span>CHAOZHI / SUBJECT INDEX</span>
+        <span>HPC · AI · SCIENCE</span>
+      </div>
 
-    <section class="stack" aria-label="主题列表">
-      {
-        tagStats.length === 0 ? (
-          <p class="empty-state">暂无主题，文章发布后将自动生成。</p>
-        ) : (
-          <ul role="list" class="topic-grid">
-            {tagStats.map(({ tag, count }) => (
-              <li>
-                <a href={withBase(`/topics/${encodeURIComponent(tag)}/`)} class="topic-item">
-                  <span class="topic-item__name">{tag}</span>
-                  <span class="topic-item__count">{count} 篇</span>
-                </a>
-              </li>
-            ))}
-          </ul>
-        )
-      }
-    </section>
+      <div class="subject-layout">
+        <aside class="editorial-panel" aria-labelledby="subject-page-title">
+          <p class="editorial-panel__section">EXPLORE / 01</p>
+          <h1 id="subject-page-title">探索主题</h1>
+          <p class="editorial-panel__intro">从计算技术到科学发现。</p>
+
+          <div class="editorial-panel__archive">
+            <p class="editorial-panel__total">{String(tagStats.length).padStart(3, '0')}</p>
+            <p class="editorial-panel__label">SUBJECTS IN ARCHIVE</p>
+          </div>
+
+          <span class="editorial-panel__rule" aria-hidden="true"></span>
+          <p class="editorial-panel__note">每一个主题，都是探索科学前沿的入口。</p>
+        </aside>
+
+        <section class="subject-directory" aria-labelledby="subject-directory-title">
+          <div class="subject-directory__heading">
+            <h2 id="subject-directory-title">ALL SUBJECTS</h2>
+            <p>按文章数量排序</p>
+          </div>
+
+          <label class="subject-search">
+            <svg aria-hidden="true" viewBox="0 0 20 20" width="18" height="18">
+              <circle cx="8.5" cy="8.5" r="5.5"></circle>
+              <path d="m12.5 12.5 4 4"></path>
+            </svg>
+            <span class="sr-only">搜索主题名称</span>
+            <input
+              type="search"
+              placeholder="搜索主题名称..."
+              autocomplete="off"
+              data-subject-search
+            />
+            <span class="subject-search__count" data-match-count aria-live="polite">
+              {tagStats.length} 个匹配
+            </span>
+          </label>
+
+          {
+            tagStats.length === 0 ? (
+              <p class="empty-state">暂无主题，文章发布后将自动生成。</p>
+            ) : (
+              <>
+                <ol class="subject-index" role="list" data-subject-index>
+                  {tagStats.map(({ tag, count }, index) => (
+                    <li data-subject-item data-subject-name={tag.normalize('NFKC').toLocaleLowerCase('zh-CN')}>
+                      <a href={withBase(`/topics/${encodeURIComponent(tag)}/`)} class="subject-entry">
+                        <span class="subject-entry__number" data-subject-number aria-hidden="true">
+                          {String(index + 1).padStart(2, '0')}
+                        </span>
+                        <span class="subject-entry__name">{tag}</span>
+                        <span class="subject-entry__count" aria-label={`${count} 篇文章`}>{count}</span>
+                      </a>
+                    </li>
+                  ))}
+                </ol>
+                <p class="subject-directory__empty" data-empty-result hidden>没有找到匹配的主题</p>
+              </>
+            )
+          }
+
+          <div class="subject-directory__foot" aria-hidden="true">
+            <span>A GROWING INDEX OF IDEAS</span>
+            <span>HPC / AI / SCIENCE</span>
+          </div>
+        </section>
+      </div>
+    </div>
   </Container>
 </BaseLayout>
 
+<script>
+  const subjectPages = document.querySelectorAll<HTMLElement>('[data-subject-page]');
+
+  subjectPages.forEach((page) => {
+    if (page.dataset.searchReady === 'true') return;
+    page.dataset.searchReady = 'true';
+
+    const input = page.querySelector<HTMLInputElement>('[data-subject-search]');
+    const count = page.querySelector<HTMLElement>('[data-match-count]');
+    const empty = page.querySelector<HTMLElement>('[data-empty-result]');
+    const items = [...page.querySelectorAll<HTMLElement>('[data-subject-item]')];
+    if (!input || !count) return;
+
+    const normalize = (value: string) =>
+      value.normalize('NFKC').trim().replace(/\s+/g, ' ').toLocaleLowerCase('zh-CN');
+
+    const filterSubjects = () => {
+      const query = normalize(input.value);
+      let visibleIndex = 0;
+
+      items.forEach((item) => {
+        const isMatch = !query || normalize(item.dataset.subjectName ?? '').includes(query);
+        item.hidden = !isMatch;
+        if (!isMatch) return;
+
+        visibleIndex += 1;
+        const number = item.querySelector<HTMLElement>('[data-subject-number]');
+        if (number) number.textContent = String(visibleIndex).padStart(2, '0');
+      });
+
+      count.textContent = `${visibleIndex} 个匹配`;
+      if (empty) empty.hidden = visibleIndex !== 0;
+    };
+
+    input.addEventListener('input', filterSubjects);
+    input.addEventListener('search', filterSubjects);
+    input.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter') return;
+      const firstMatch = items.find((item) => !item.hidden)?.querySelector<HTMLAnchorElement>('a');
+      if (firstMatch) {
+        event.preventDefault();
+        firstMatch.click();
+      }
+    });
+  });
+</script>
+
 <style>
-  .topic-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: var(--space-sm);
-    list-style: none;
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
     padding: 0;
-    margin: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
   }
 
-  .topic-item {
+  .subject-page {
+    padding-block: 1.35rem var(--space-3xl);
+  }
+
+  .subject-masthead {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: var(--space-sm);
-    padding: var(--space-md) var(--space-lg);
-    background-color: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    text-decoration: none;
-    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
-  }
-
-  .topic-item:hover {
-    border-color: var(--color-brand-border);
-    box-shadow: var(--shadow-card);
-  }
-
-  .topic-item__name {
-    font-size: var(--fs-base);
+    gap: var(--space-lg);
+    padding-bottom: 0.9rem;
+    border-bottom: 1px solid var(--color-border);
+    color: #918ca3;
+    font-size: 0.65rem;
     font-weight: var(--fw-medium);
-    color: var(--color-heading);
+    letter-spacing: 0.17em;
+    line-height: 1.4;
   }
 
-  .topic-item__count {
-    font-size: var(--fs-xs);
+  .subject-layout {
+    display: grid;
+    grid-template-columns: minmax(14rem, 0.28fr) minmax(0, 0.72fr);
+    gap: clamp(3.5rem, 6vw, 5rem);
+    padding-top: 2.7rem;
+  }
+
+  .editorial-panel {
+    position: sticky;
+    top: calc(var(--height-header) + 1.5rem);
+    align-self: start;
+  }
+
+  .editorial-panel__section,
+  .editorial-panel__label,
+  .subject-directory__heading,
+  .subject-directory__foot {
+    font-size: 0.68rem;
+    font-weight: var(--fw-medium);
+    letter-spacing: 0.13em;
+  }
+
+  .editorial-panel__section {
+    margin: 0 0 1.25rem;
+    color: var(--color-brand);
+  }
+
+  .editorial-panel h1 {
+    margin: 0;
+    font-size: clamp(2.35rem, 3.5vw, 2.75rem);
+    font-weight: var(--fw-semibold);
+    letter-spacing: -0.055em;
+    line-height: 1.12;
+  }
+
+  .editorial-panel__intro {
+    margin: 0.85rem 0 0;
     color: var(--color-text-muted);
-    background-color: var(--color-brand-soft);
-    padding: var(--space-2xs) var(--space-sm);
-    border-radius: var(--radius-pill);
+    font-size: var(--fs-sm);
+  }
+
+  .editorial-panel__archive {
+    margin-top: 3.2rem;
+  }
+
+  .editorial-panel__total {
+    margin: 0;
+    color: var(--color-heading);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: clamp(3.75rem, 6vw, 4.5rem);
+    font-weight: 300;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.08em;
+    line-height: 0.95;
+  }
+
+  .editorial-panel__label {
+    margin: 0.7rem 0 0;
+    color: var(--color-text-muted);
+    font-size: 0.62rem;
+  }
+
+  .editorial-panel__rule {
+    display: block;
+    width: 1.9rem;
+    height: 2px;
+    margin-top: 2.15rem;
+    background: var(--color-brand);
+  }
+
+  .editorial-panel__note {
+    max-width: 12.5rem;
+    margin: 1rem 0 0;
+    color: var(--color-text-muted);
+    font-size: var(--fs-sm);
+    line-height: 1.75;
+  }
+
+  .subject-directory {
+    min-width: 0;
+  }
+
+  .subject-directory__heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-lg);
+    min-height: 1.2rem;
+    color: var(--color-text-muted);
+  }
+
+  .subject-directory__heading h2,
+  .subject-directory__heading p {
+    margin: 0;
+    color: inherit;
+    font: inherit;
+  }
+
+  .subject-search {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.8rem;
+    min-height: 3.55rem;
+    margin-top: 0.85rem;
+    border-bottom: 1px solid var(--color-border-strong);
+    color: var(--color-text-muted);
+    transition: border-color 200ms ease;
+  }
+
+  .subject-search:focus-within {
+    border-bottom-color: var(--color-brand);
+  }
+
+  .subject-search svg {
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-width: 1.4;
+  }
+
+  .subject-search input {
+    min-width: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--color-heading);
+    font: inherit;
+    font-size: var(--fs-sm);
+    line-height: 1.5;
+  }
+
+  .subject-search input::placeholder {
+    color: #9792a5;
+  }
+
+  .subject-search__count {
+    color: var(--color-text-muted);
+    font-size: var(--fs-xs);
+    font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
 
-  .empty-state {
-    padding: var(--space-2xl);
-    text-align: center;
+  .subject-index {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: clamp(1.75rem, 3.5vw, 2.5rem);
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .subject-index li {
+    min-width: 0;
+  }
+
+  .subject-index li[hidden] {
+    display: none;
+  }
+
+  .subject-entry {
+    position: relative;
+    display: grid;
+    grid-template-columns: 2.2rem minmax(0, 1fr) 2rem;
+    align-items: center;
+    gap: 0.65rem;
+    min-height: 3.25rem;
+    padding-block: 0.72rem;
+    border-bottom: 1px solid var(--color-border);
+    color: var(--color-heading);
+    text-decoration: none;
+    outline: none;
+  }
+
+  .subject-entry::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    bottom: -1px;
+    left: 0;
+    height: 1px;
+    background: var(--color-brand);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 200ms ease;
+  }
+
+  .subject-entry__number,
+  .subject-entry__count {
+    color: #8b8699;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.7rem;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
+    line-height: 1.2;
+    transition: color 200ms ease;
+  }
+
+  .subject-entry__count {
+    text-align: right;
+  }
+
+  .subject-entry__name {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    color: var(--color-heading);
+    font-size: 0.96rem;
+    font-weight: var(--fw-medium);
+    line-height: 1.45;
+    transition: color 200ms ease, transform 200ms ease;
+  }
+
+  .subject-entry:hover::after,
+  .subject-entry:focus-visible::after {
+    transform: scaleX(1);
+  }
+
+  .subject-entry:hover .subject-entry__name,
+  .subject-entry:focus-visible .subject-entry__name {
+    color: var(--color-brand-strong);
+    transform: translateX(3px);
+  }
+
+  .subject-entry:hover .subject-entry__count,
+  .subject-entry:focus-visible .subject-entry__count {
+    color: var(--color-text);
+  }
+
+  .subject-entry:focus-visible {
+    box-shadow: 0 0 0 2px var(--color-brand-soft);
+  }
+
+  .subject-directory__empty {
+    margin: 0;
+    padding-block: 3.5rem;
+    border-bottom: 1px solid var(--color-border);
     color: var(--color-text-muted);
-    background-color: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
+    font-size: var(--fs-sm);
+    text-align: center;
+  }
+
+  .subject-directory__empty[hidden] {
+    display: none;
+  }
+
+  .subject-directory__foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-lg);
+    margin-top: 2rem;
+    padding-top: 0.8rem;
+    border-top: 1px solid var(--color-border);
+    color: #9a95a7;
+    font-size: 0.62rem;
+  }
+
+  .empty-state {
+    margin: 0;
+    padding-block: 3rem;
+    color: var(--color-text-muted);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  @media (max-width: 960px) {
+    .subject-layout {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 2.6rem;
+      padding-top: 2.1rem;
+    }
+
+    .editorial-panel {
+      position: static;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      column-gap: 2rem;
+      align-items: end;
+    }
+
+    .editorial-panel__section,
+    .editorial-panel h1,
+    .editorial-panel__intro,
+    .editorial-panel__rule,
+    .editorial-panel__note {
+      grid-column: 1;
+    }
+
+    .editorial-panel__archive {
+      grid-column: 2;
+      grid-row: 1 / span 5;
+      align-self: center;
+      margin: 0;
+      text-align: right;
+    }
+
+    .editorial-panel__note {
+      max-width: 22rem;
+    }
+  }
+
+  @media (max-width: 620px) {
+    .subject-page {
+      padding-top: 1rem;
+    }
+
+    .subject-masthead {
+      align-items: flex-start;
+      font-size: 0.58rem;
+      letter-spacing: 0.12em;
+    }
+
+    .subject-layout {
+      gap: 2rem;
+      padding-top: 1.7rem;
+    }
+
+    .editorial-panel {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .editorial-panel__archive {
+      grid-column: 1;
+      grid-row: auto;
+      margin-top: 1.8rem;
+      text-align: left;
+    }
+
+    .editorial-panel__total {
+      font-size: 3.2rem;
+    }
+
+    .editorial-panel__rule {
+      margin-top: 1.6rem;
+    }
+
+    .editorial-panel__note {
+      margin-top: 0.85rem;
+    }
+
+    .subject-directory__heading p {
+      display: none;
+    }
+
+    .subject-search {
+      min-height: 3.4rem;
+    }
+
+    .subject-index {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .subject-entry {
+      grid-template-columns: 2rem minmax(0, 1fr) 1.8rem;
+    }
+
+    .subject-directory__foot {
+      align-items: flex-start;
+      font-size: 0.56rem;
+      letter-spacing: 0.09em;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .subject-search,
+    .subject-entry::after,
+    .subject-entry__number,
+    .subject-entry__name,
+    .subject-entry__count {
+      transition-duration: 0.01ms;
+    }
+
+    .subject-entry:hover .subject-entry__name,
+    .subject-entry:focus-visible .subject-entry__name {
+      transform: none;
+    }
   }
 </style>

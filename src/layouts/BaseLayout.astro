@@ -10,6 +10,7 @@
  *   <页面内容 />
  * </Layout>
  */
+import { ClientRouter } from 'astro:transitions';
 import '../styles/reset.css';
 import '../styles/global.css';
 import Header from '../components/Header.astro';
@@ -60,6 +61,11 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? Astro.url);
     <meta property="og:description" content={description} />
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="zh_CN" />
+
+    {/* 客户端路由：启用 Astro View Transitions，实现站内导航不整页重载。
+     * 配合 Header 的 transition:persist 持久化 Header DOM，
+     * 使 Logo 图片在页面切换时不被销毁重建，消除"消失再出现"闪烁。 */}
+    <ClientRouter />
   </head>
 
   <body>
