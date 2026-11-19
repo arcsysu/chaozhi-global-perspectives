@@ -705,15 +705,13 @@ function isActive(item: (typeof navItems)[number]): boolean {
 
   .header__site-name {
     font-family: var(--font-display);
-    /* 流式字号：小屏 20px → 大屏 25px */
-    font-size: clamp(20px, 1.25rem + 0.5vw, 25px);
+    font-size: 25px;
     font-weight: var(--fw-semibold);
     color: var(--color-heading);
   }
 
   .header__brief {
-    /* 流式字号：小屏 12px → 大屏 13px */
-    font-size: clamp(12px, 0.75rem + 0.15vw, 13px);
+    font-size: 13px;
     color: var(--color-text-muted);
     white-space: nowrap;
   }
@@ -734,8 +732,7 @@ function isActive(item: (typeof navItems)[number]): boolean {
     display: inline-block;
     padding-block: var(--space-sm);
     color: var(--color-text);
-    /* 流式字号：小屏 15px → 大屏 18px */
-    font-size: clamp(15px, 0.9375rem + 0.4vw, 18px);
+    font-size: 18px;
     font-weight: var(--fw-medium);
     transition: color var(--transition-fast);
   }
@@ -772,9 +769,8 @@ function isActive(item: (typeof navItems)[number]): boolean {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    /* 流式尺寸：小屏 40px → 大屏 60px */
-    width: clamp(40px, 2.5rem + 1vw, 60px);
-    height: clamp(40px, 2.5rem + 1vw, 60px);
+    width: 60px;
+    height: 60px;
     border-radius: var(--radius-md);
     color: var(--color-text-muted);
     transition:
@@ -899,12 +895,8 @@ function isActive(item: (typeof navItems)[number]): boolean {
     color: var(--home-header-text, #2b2640);
   }
 
-  /* 响应式：≤768px 双行紧凑布局
+  /* 响应式：≤768px 切换为移动导航
    * 移动端：页眉贴顶 top:0，近屏宽，仅保留少量左右边距。
-   * 第一行：品牌 + 搜索（flex 自动分配空间）
-   * 第二行：四项横向导航入口（nav 换行至第二行，全宽居中）
-   * 不使用纵向折叠大菜单，保持紧凑高效。
-   * toggle 按钮和 mobile-nav 面板保持隐藏（桌面已是 none/hidden）。
    */
   @media (max-width: 768px) {
     .header {
@@ -919,37 +911,25 @@ function isActive(item: (typeof navItems)[number]): boolean {
       min-height: var(--height-header-mobile);
       gap: var(--space-sm);
       padding-inline: var(--space-sm);
-      /* 允许导航换行至第二行 */
-      flex-wrap: wrap;
     }
 
-    /* 品牌区固定在第一行左侧 */
-    .header__brand {
-      flex-shrink: 0;
+    .header__brief {
+      display: none;
     }
 
-    /* 搜索按钮固定在第一行右侧 */
-    .header__actions {
-      margin-left: auto;
-    }
-
-    /* 主导航换行至第二行，横向铺满居中 */
     .header__nav {
-      order: 3;
-      flex-basis: 100%;
-      margin-inline: 0;
+      display: none;
     }
 
-    .header__nav-list {
-      justify-content: center;
-      gap: var(--space-md, 1rem);
+    .header__toggle {
+      display: inline-flex;
     }
 
-    /* 简介（副标题）在超小屏隐藏，避免与站名争夺空间 */
-    @media (max-width: 480px) {
-      .header__brief {
-        display: none;
-      }
+    .mobile-nav {
+      display: block;
+      /* 移动端折叠面板继承页眉的圆角与边框 */
+      border-radius: var(--radius-md, 8px);
+      margin-top: var(--space-2xs, 4px);
     }
   }
 

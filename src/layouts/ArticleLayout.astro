@@ -213,11 +213,10 @@ const isDemo = meta.isDemo ?? false;
   /* 三栏布局容器 */
   .article-layout {
     display: grid;
-    /* 侧栏适度收缩，扩大正文区：main 可用宽从 580px 提升至约 660px */
     grid-template-columns:
-      minmax(160px, 200px)
+      minmax(180px, 220px)
       minmax(0, 1fr)
-      minmax(160px, 220px);
+      minmax(180px, 240px);
     gap: var(--space-xl, 32px);
     max-width: var(--width-content, 72rem);
     margin-inline: auto;
@@ -237,8 +236,7 @@ const isDemo = meta.isDemo ?? false;
   /* 中栏正文宽度限制 */
   .article-layout__main {
     min-width: 0;
-    /* 与实际 grid 分配宽度匹配，避免 max-width 大于 track 宽度导致形同虚设 */
-    max-width: 680px;
+    max-width: 720px;
     margin-inline: auto;
   }
 
@@ -348,10 +346,10 @@ const isDemo = meta.isDemo ?? false;
   }
 
   /* ────────────────────────────────────────
-   * 响应式：平板（768–1024px）双栏
+   * 响应式：平板（768–1023px）双栏
    * 中正文 + 右来源，左栏目录隐藏（头部元信息已统一在中栏）
    * ──────────────────────────────────────── */
-  @media (max-width: 1024px) {
+  @media (max-width: 1023px) {
     .article-layout {
       grid-template-columns:
         minmax(0, 1fr)
@@ -368,7 +366,7 @@ const isDemo = meta.isDemo ?? false;
    * 响应式：手机（<768px）单栏
    * 元信息在正文开头，来源回退到文末（GFM 默认渲染）
    * ──────────────────────────────────────── */
-  @media (max-width: 768px) {
+  @media (max-width: 767px) {
     .article-layout {
       grid-template-columns: minmax(0, 1fr);
       gap: 0;
