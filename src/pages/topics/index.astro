@@ -91,9 +91,13 @@ const tagStats = await getTagStats();
 </BaseLayout>
 
 <script>
-  const subjectPages = document.querySelectorAll<HTMLElement>('[data-subject-page]');
-
-  subjectPages.forEach((page) => {
+  // ClientRouter 兼容：站内导航（首页/文章页 → 主题页）swap DOM 后，
+  // 原 [data-subject-page] 元素被替换为新节点，data-searchReady 标记不存在，
+  // 且模块脚本不会重新执行 → 需用 astro:page-load 在每次页面加载后重新初始化。
+  // 与 ArticleTOC / CopyLinkButton 等组件一致；data-search-ready 兜底防重复绑定。
+  function initSubjectSearch() {
+    const page = document.querySelector<HTMLElement>('[data-subject-page]');
+    if (!page) return; // 非主题页
     if (page.dataset.searchReady === 'true') return;
     page.dataset.searchReady = 'true';
 
@@ -106,12 +110,23 @@ const tagStats = await getTagStats();
     const normalize = (value: string) =>
       value.normalize('NFKC').trim().replace(/\s+/g, ' ').toLocaleLowerCase('zh-CN');
 
+    // 预计算每个 item 的匹配文本（规范化 tag 名 + 显示名），避免每次输入重复计算。
+    // 显示名取自 .subject-entry__name，包含主题的原始中/英文名称（如 "AI for Science"）。
+    const itemMatchTexts = items.map((item) => {
+      const tagName = normalize(item.dataset.subjectName ?? '');
+      const displayName = normalize(
+        item.querySelector<HTMLElement>('.subject-entry__name')?.textContent ?? '',
+      );
+      // 合并去重（tag 名与显示名可能重复，如纯中文主题）
+      return `${tagName} ${displayName}`;
+    });
+
     const filterSubjects = () => {
       const query = normalize(input.value);
       let visibleIndex = 0;
 
-      items.forEach((item) => {
-        const isMatch = !query || normalize(item.dataset.subjectName ?? '').includes(query);
+      items.forEach((item, index) => {
+        const isMatch = !query || itemMatchTexts[index].includes(query);
         item.hidden = !isMatch;
         if (!isMatch) return;
 
@@ -134,7 +149,9 @@ const tagStats = await getTagStats();
         firstMatch.click();
       }
     });
-  });
+  }
+
+  document.addEventListener('astro:page-load', initSubjectSearch);
 </script>
 
 <style>
