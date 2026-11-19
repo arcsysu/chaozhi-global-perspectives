@@ -23,7 +23,6 @@ import {
   getNextArticle,
 } from '@/utils/articles';
 import type { ArticleHeadMeta } from '@/layouts/ArticleLayout.astro';
-import { withBase } from '@/utils/site';
 
 /**
  * 预生成所有已发布文章的详情页。
@@ -94,7 +93,7 @@ const meta: ArticleHeadMeta = {
   headings={headings}
   markdownBody={entry.body ?? ''}
   next={next}
-  linkPrefix={withBase('/articles/')}
+  linkPrefix="/articles/"
 >
   <Content />
 </ArticleLayout>
