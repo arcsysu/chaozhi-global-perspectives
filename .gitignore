@@ -33,3 +33,4 @@ src/content/_demo/
 
 # build cache
 cache/
+.cache/

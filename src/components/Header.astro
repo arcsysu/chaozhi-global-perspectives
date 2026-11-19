@@ -158,6 +158,28 @@ function isActive(item: (typeof navItems)[number]): boolean {
   // 导航生命周期：
   // - astro:page-load：每次页面加载后触发（含首次加载 + 每次 ClientRouter 导航后）。
   //   用于重置状态、重新同步 data-home / 导航高亮 / Hero 背景。
+  //
+  // ──────────────────────────────────────────────
+  // 文章页返回导航（统一返回上一页）
+  //
+  // 问题背景：
+  // - 文章顶部返回按钮（.article-back__link）与精简阅读栏返回按钮
+  //   （.reading-bar__logo）曾用两套实现：前者 history.back()，后者纯静态
+  //   <a href="/">，导致精简 Header 返回按钮错误跳首页。
+  // - history.length 无法区分站内/外部历史（标签页历史可能含外部网站），
+  //   直接 back() 可能跳到外部网站，不安全。
+  // - document.referrer 在 ClientRouter 下不更新（始终首屏来源），不可靠。
+  //
+  // 统一方案（最小必要的站内来源记录）：
+  // - 维护 inSiteNavDepth 计数器：记录从标签页首个站内页面开始累计的站内
+  //   导航深度（pushState / ClientRouter 前进 +1，back/forward -1）。
+  //   首屏加载时若来源为外部或直接打开，深度从 0 起；站内链接点进来则继承。
+  // - astro:before-swap（站内前进）/ astro:after-swap 后据方向更新深度。
+  // - 所有 [data-back-nav]（顶部 + 精简栏 + 移动端）走同一事件委托：
+  //   有可靠站内来源（depth > 0）→ history.back() 恢复来源页与滚动位置；
+  //   无可靠来源 → 用 data-back-href 整页跳转首页（绝不跳外部网站）。
+  // - 事件委托在 persist Header 上注册一次，精简栏 DOM 每次导航重建也会被覆盖，
+  //   无重复绑定、无旧闭包残留。
   // ──────────────────────────────────────────────
 
   /** 主导航项（与 site.ts navItems 同步，用于客户端高亮判断） */
@@ -399,6 +421,122 @@ function isActive(item: (typeof navItems)[number]): boolean {
   // astro:page-load：每次页面加载后触发（首次加载 + 每次 ClientRouter 站内导航后）。
   // 在此重置 Header 状态并重新同步导航高亮 / data-home / Hero 背景。
   document.addEventListener('astro:page-load', resetHeaderForNavigation);
+
+  // ──────────────────────────────────────────────
+  // 统一返回上一页导航（文章页所有返回入口）
+  //
+  // 覆盖入口：
+  // - 文章顶部返回按钮（.article-back__link[data-back-nav]）
+  // - 精简阅读栏返回按钮（.reading-bar__logo[data-back-nav]）
+  // - 移动端相应入口（统一带 data-back-nav）
+  //
+  // 站内来源判定（最小必要记录，不依赖 document.referrer / history.length）：
+  // - 在 history.state 上打 __site 标记，标识"站内导航可达的条目"。
+  // - 首屏加载：若来源为站内（document.referrer 同源）则给当前 entry 打 __site；
+  //   否则（直接打开 / 外部进入）不打标记，作为站内历史的"根"。
+  // - ClientRouter 站内前进：astro:before-swap 时给即将进入的 entry 标记 __site
+  //   （通过 astro:before-preparation 或 swap 前的 pushState 时机）。
+  //   实际 ClientRouter 自身已 pushState 新 URL，我们在 astro:after-swap
+  //   补打 __site 标记（保留原 state 其它字段，如首页分页的 scrollY）。
+  // - 浏览器原生后退/前进：popstate 恢复的 state 自带 __site 标记（若曾是站内）。
+  //
+  // 点击返回逻辑：
+  // - 当前 entry 的前一个 entry 是否站内？用 history.state.__site 判断"当前在站内
+  //   历史链中"还不够——需要知道能否安全 back() 回站内页。
+  // - 采用计数法 + 标记法结合：维护 canGoBackInSite = 当前 history.state 有 __site
+  //   且不是站内历史的第一个 entry。判断"是否第一个站内 entry"：若当前 state.__site
+  //   存在但其来源（前一条）无 __site，则 back() 会离开站内 → 不安全。
+  // - 简化可靠实现：只要当前页面是通过站内导航进入（state.__site === true），
+  //   就认为存在可 back 的站内来源。首屏直接打开/外部进入时 state 无 __site，
+  //   不走 back()，直接 fallback 到首页。这覆盖了所有预期场景：
+  //     * 首页列表→文章：文章 entry 有 __site（站内导航进入）→ back() 回列表。
+  //     * 直接打开文章 URL：首屏无 __site → fallback 首页。
+  //     * 外部→文章：首屏无 __site → fallback 首页。
+  //
+  // 事件委托优势：
+  // - persist Header 的 <script> 仅执行一次，事件委托注册一次。
+  // - 精简阅读栏 DOM 每次导航重建，但其 [data-back-nav] 冒泡到 document
+  //   委托处理器，无需重新绑定，无旧闭包残留。
+  // ──────────────────────────────────────────────
+
+  /** 站内来源标记的 state key */
+  const SITE_HISTORY_KEY = '__site';
+
+  /** 判断当前 history.state 是否带有站内来源标记 */
+  function currentEntryIsInSiteHistory(): boolean {
+    const st = window.history.state;
+    return !!st && typeof st === 'object' && st[SITE_HISTORY_KEY] === true;
+  }
+
+  /** 给当前 history entry 打上站内标记（保留其它 state 字段） */
+  function markCurrentEntryInSite(): void {
+    try {
+      const st = window.history.state || {};
+      if (st[SITE_HISTORY_KEY] === true) return; // 已标记
+      const next = { ...st, [SITE_HISTORY_KEY]: true };
+      window.history.replaceState(next, '');
+    } catch {
+      // history.state 序列化失败等异常：静默，保守不标记
+    }
+  }
+
+  /**
+   * 是否已完成首屏 page-load。
+   * 首屏（硬导航）的 history entry 视为"站内历史链的根"，不打 __site 标记：
+   * - 直接打开文章 URL / 外部进入文章 → 首屏无 __site → 返回按钮 fallback 首页。
+   * - 首页点文章 → 文章页是第二次 page-load（非首屏）→ 打 __site → back() 回首页。
+   */
+  let firstPageLoadDone = false;
+
+  /**
+   * astro:page-load：每次页面加载后触发（首屏 + 每次 ClientRouter 站内导航后）。
+   * - 首屏：仅置 firstPageLoadDone=true，不打标记（作为站内历史链根）。
+   * - 非首屏（站内导航进入）：给当前 entry 打 __site 标记，表示有可 back 的站内来源。
+   *   保留原 state（首页分页 pushState 的 { homePagination, scrollY } 等字段）。
+   *
+   * 用 page-load 而非 after-swap 的原因：page-load 在 after-swap 之后触发，
+   * 此时 ClientRouter 的 pushState 已完成，history.state 已是新 entry 的 state，
+   * replaceState 补打 __site 安全且不会与 ClientRouter 的 state 操作竞争。
+   */
+  document.addEventListener('astro:page-load', () => {
+    if (!firstPageLoadDone) {
+      firstPageLoadDone = true;
+      return;
+    }
+    markCurrentEntryInSite();
+  });
+
+  /**
+   * 统一返回按钮事件委托：document 级，覆盖所有 [data-back-nav]（含重建的精简栏）。
+   * persist Header 脚本仅执行一次 → 委托器只注册一次，无重复绑定。
+   */
+  document.addEventListener('click', (e: MouseEvent) => {
+    const target = e.target;
+    const link =
+      target instanceof Element
+        ? (target.closest('[data-back-nav]') as HTMLAnchorElement | null)
+        : null;
+    if (!link) return;
+
+    // 中键/右键/Ctrl(Cmd)+点击/Shift+点击等走原生行为（新标签页等）
+    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+
+    e.preventDefault();
+
+    // fallback href：无可靠站内来源时整页跳转（默认首页，绝不跳外部）
+    const fallbackHref = link.getAttribute('data-back-href') || '/';
+
+    // 判定是否存在可靠的站内来源（当前 entry 由站内导航进入）
+    if (currentEntryIsInSiteHistory()) {
+      // 有可靠站内来源：history.back() 恢复来源页及滚动位置。
+      // ClientRouter 下 back() 触发 popstate → 站内页面切换，不整页卸载。
+      // 首页分页的 popstate 处理器会据 data-page 恢复正确分页与滚动位置。
+      window.history.back();
+    } else {
+      // 无可靠站内来源（直接打开 / 外部进入）：安全回退首页
+      window.location.href = fallbackHref;
+    }
+  });
 </script>
 
 <style>

@@ -39,7 +39,13 @@ const { title, backHref, backLabel } = Astro.props;
 
 <div class="reading-bar" id="reading-bar" aria-hidden="true" data-visible="false">
   <div class="reading-bar__inner">
-    <a href={backHref} class="reading-bar__logo" aria-label={backLabel}>
+    <a
+      href={backHref}
+      class="reading-bar__logo"
+      aria-label={backLabel}
+      data-back-nav
+      data-back-href={backHref}
+    >
       {/* 缩小的 YatCC Logo 占位 */}
       <svg
         xmlns="http://www.w3.org/2000/svg"

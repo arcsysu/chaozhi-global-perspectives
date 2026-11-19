@@ -39,10 +39,18 @@
 </div>
 
 <script>
-  const btn = document.getElementById('copy-link-btn');
-  const feedback = document.getElementById('copy-link-feedback');
+  // ClientRouter 兼容：站内导航（首页→文章页）时 DOM 被 swap 替换，
+  // 原按钮元素的事件监听随旧 DOM 移除，新按钮无绑定 → 点击"分享本文"无反应。
+  // 与 ArticleTOC / ReadingProgressBar 等组件一致，用 astro:page-load
+  // 在每次页面加载（含站内导航）后重新绑定。swap 后为新元素，不会重复绑定；
+  // data-copy-bound 标记兜底，防止同元素被重复 init。
+  function initCopyLink() {
+    const btn = document.getElementById('copy-link-btn');
+    const feedback = document.getElementById('copy-link-feedback');
+    if (!btn) return; // 非文章页无此按钮
+    if (btn.dataset.copyBound === '1') return;
+    btn.dataset.copyBound = '1';
 
-  if (btn) {
     btn.addEventListener('click', async () => {
       const url = window.location.href;
       try {
@@ -77,6 +85,8 @@
       }
     });
   }
+
+  document.addEventListener('astro:page-load', initCopyLink);
 </script>
 
 <style>

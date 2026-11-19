@@ -119,6 +119,27 @@ const appendSiteName = page === 1 ? false : true;
    * 4. bfcache 恢复时 DOM 已正确（data-page 匹配），跳过 swap
    * 5. fetch 失败时回退为整页跳转（渐进增强）
    * 6. 支持 prefers-reduced-motion（跳过淡入淡出和平滑滚动）
+   *
+   * 滚动定位策略（区分三种场景）：
+   * - 主动点击分页：swap 完成后平滑滚动到 #latest-articles 标题（避开固定 Header）
+   * - 浏览器前进/后退（popstate）：精确恢复该历史条目保存的 scrollY（瞬间定位，不平滑）
+   * - 首次整页加载 / 直接访问 /page/N/：若 URL 不含 #latest-articles 锚点，
+   *   且当前页码 > 1（即 /page/2/ 等），则瞬间定位到 #latest-articles 标题，
+   *   避免停留在 Hero 顶部。第 1 页（/）保持顶部（Hero 即首屏内容）。
+   *
+   * ─── 二次滚动防御（关键）─────────────────────────
+   * 根因：CSS `scroll-behavior: smooth`（本文件 <style> 中 :global(html)）会使
+   * `scrollTo({behavior:'auto'})` 也变为平滑动画（CSSOM View 规范：'auto' 继承 CSS 值）。
+   * 这导致 initHomeScrollPosition / popstate restore 的"瞬间定位"实际是 300ms 平滑动画，
+   * 在动画期间若 Astro ClientRouter 的 onScrollEnd 或 astro:page-load 触发，
+   * 可与正在进行的平滑滚动竞争，造成"先到标题再回顶部"的二次滚动。
+   *
+   * 修复要点：
+   * A. 所有需要"瞬间定位"的场景（首次加载、popstate restore）一律用 `behavior:'instant'`，
+   *    绕过 CSS scroll-behavior 平滑化（'instant' 不受 CSS 值影响）。
+   * B. pushState 时保存当前真实 scrollY（而非占位 0），避免历史条目 scrollY=0 的脏数据。
+   * C. 用 homeScrollReady 标志位防止 astro:page-load 触发的重复 init 与正在进行的
+   *    分页 scroll 竞争（ClientRouter persist Header 后脚本不重新执行，但直达/刷新会重跑）。
    */
   const containerEl = document.getElementById('home-article-list');
   if (containerEl) {
@@ -126,6 +147,15 @@ const appendSiteName = page === 1 ? false : true;
     const container: HTMLElement = containerEl;
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     let abortController: AbortController | null = null;
+
+    /**
+     * 分页滚动控制器标志位：
+     * - false：尚未初始化或有进行中的分页操作
+     * - true：初始化完成，可安全处理 popstate
+     * 用于防止 astro:page-load 触发的 initHomeScrollPosition 与进行中的
+     * fetchAndSwap→scrollToLatest 竞争（ClientRouter 站内导航直达时）。
+     */
+    let homeScrollReady = false;
 
     /** 从 URL 提取页码（/page/2/ → 2，/ → 1） */
     function getPageFromUrl(url: string): number {
@@ -143,14 +173,52 @@ const appendSiteName = page === 1 ? false : true;
       }
     }
 
-    /** 平滑滚动到 #latest-articles 顶部（CSS scroll-margin-top 自动避开 Header） */
-    function scrollToLatest() {
+    /** 读取固定 Header 高度（与 CSS --height-header 一致），用于精确滚动偏移 */
+    function getHeaderOffset(): number {
+      // 桌面 4.5rem(72px) / 移动 4rem(64px)，取实际生效的 CSS 变量
+      const cssVar = getComputedStyle(document.documentElement)
+        .getPropertyValue('--height-header')
+        .trim();
+      const cssMobile = getComputedStyle(document.documentElement)
+        .getPropertyValue('--height-header-mobile')
+        .trim();
+      const px = (val: string) => {
+        const n = parseFloat(val);
+        return isNaN(n) ? 0 : n * 16; // rem → px（html font-size 默认 16px）
+      };
+      const isMobile = window.matchMedia('(max-width: 768px)').matches;
+      const h = isMobile ? px(cssMobile) : px(cssVar);
+      // 兜底：变量缺失时用 72px
+      return h > 0 ? h : 72;
+    }
+
+    /**
+     * 精确滚动到 #latest-articles 标题顶部，考虑固定 Header 高度。
+     * 使用 window.scrollTo 而非 scrollIntoView，避免列表内容高度变化时
+     * 平滑动画目标位移导致落点不准。在 swap 后 DOM 稳定时计算 offsetTop。
+     *
+     * @param instant  true=瞬间定位（首次加载/popstate restore），false=平滑滚动（主动分页）
+     *
+     * 关键：CSS `:global(html){scroll-behavior:smooth}` 会使 `behavior:'auto'`
+     * 也变为平滑动画。必须用 `'instant'`（CSSOM 规范保留值，不受 CSS 影响）
+     * 才能实现真正的瞬间定位，避免 300ms 平滑窗口期间的滚动竞争。
+     * prefers-reduced-motion 时所有滚动都走 instant。
+     */
+    function scrollToLatest(instant = false) {
       const target = document.getElementById('latest-articles');
       if (!target) return;
-      target.scrollIntoView({
-        behavior: reducedMotion ? 'auto' : 'smooth',
-        block: 'start',
-      });
+      // 用 offsetTop 累加 offsetParent 链得到文档绝对偏移
+      let offset = 0;
+      let el: HTMLElement | null = target;
+      while (el) {
+        offset += el.offsetTop;
+        el = el.offsetParent as HTMLElement | null;
+      }
+      const headerOffset = getHeaderOffset();
+      // 额外 8px 视觉间距，确保标题不被 Header 贴边
+      const targetY = Math.max(0, offset - headerOffset - 8);
+      const behavior: ScrollBehavior = (instant || reducedMotion) ? 'instant' : 'smooth';
+      window.scrollTo({ top: targetY, behavior });
     }
 
     /** 将当前滚动位置保存到 history state（供 popstate 恢复） */
@@ -202,11 +270,16 @@ const appendSiteName = page === 1 ? false : true;
           container.style.opacity = '1';
         }
 
-        // 滚动处理
+        // 滚动处理：swap 完成、DOM 稳定后再定位
         if (options.scrollTo === 'restore' && options.restoreY != null) {
-          window.scrollTo(0, options.restoreY);
+          // 历史恢复：精确恢复到进入文章前的原始滚动位置（瞬间，不平滑）
+          // 用 'instant' 避免 CSS smooth 使 restore 变为动画，防止与
+          // Astro onScrollEnd 的 scrollY 保存竞争。
+          // （reducedMotion 不影响：restore 一律瞬间定位）
+          window.scrollTo({ top: options.restoreY, behavior: 'instant' });
         } else {
-          scrollToLatest();
+          // 主动分页：平滑滚到 #latest-articles 标题
+          scrollToLatest(false);
         }
       } catch (e) {
         // AbortError：被新的 fetch 取消，静默忽略
@@ -234,11 +307,23 @@ const appendSiteName = page === 1 ? false : true;
       // 保存当前滚动位置（供后退时恢复）
       saveScrollState();
 
-      // 推入新历史条目
-      history.pushState({ homePagination: true, scrollY: 0 }, '', targetUrl);
+      // 推入新历史条目。
+      // 关键：scrollY 保存当前真实位置（而非占位 0），避免历史条目携带脏的
+      // scrollY=0。fetchAndSwap 完成后 scrollToLatest 会定位到标题，
+      // Astro onScrollEnd（router.js:402-405）会随后将真实 scrollY 写入 state，
+      // 但在 onScrollEnd 触发前若有 popstate/pageshow 恢复，这里保存的
+      // 当前位置比 0 更安全（至少回到点击前的位置而非页面顶部）。
+      const currentScrollY = window.scrollY;
+      history.pushState({ homePagination: true, scrollY: currentScrollY }, '', targetUrl);
+
+      // 标记进行中：防止 initHomeScrollPosition（若被 astro:page-load 触发）干扰
+      homeScrollReady = false;
 
       // 局部替换列表
       await fetchAndSwap(targetUrl, { scrollTo: 'latest' });
+
+      // 分页操作完成，恢复 ready 状态
+      homeScrollReady = true;
     });
 
     // ─── popstate：浏览器前进/后退 ───────────────────
@@ -248,19 +333,51 @@ const appendSiteName = page === 1 ? false : true;
       const currentPage = parseInt(container.dataset.page || '1', 10);
 
       // DOM 页码与 URL 页码不一致 → 需要局部 swap
-      // 一致 → bfcache 恢复或新页面加载，DOM 已正确，跳过
+      // 一致 → bfcache 恢复或新页面加载，DOM 已正确，跳过 swap
       if (expectedPage !== currentPage) {
         const state = history.state;
         const restoreY =
           state && typeof state.scrollY === 'number' ? state.scrollY : 0;
         fetchAndSwap(url, { scrollTo: 'restore', restoreY });
+      } else {
+        // DOM 已匹配（bfcache 恢复）：恢复该条目保存的精确滚动位置。
+        // 用 'instant' 而非默认 'auto'，避免 CSS scroll-behavior:smooth
+        // 使 restore 变为动画，导致与 Astro 的 scroll 处理竞争。
+        const state = history.state;
+        const restoreY =
+          state && typeof state.scrollY === 'number' ? state.scrollY : null;
+        if (restoreY != null) {
+          window.scrollTo({ top: restoreY, behavior: 'instant' });
+        }
       }
     });
 
-    // ─── 初始化：保存初始滚动位置 ───────────────────
-    // 使用 requestAnimationFrame 确保布局完成后获取正确 scrollY
-    requestAnimationFrame(() => {
+    // ─── 初始化：首次加载 / 直接访问 /page/N/ 的滚动定位 ───────────────────
+    // 区分场景：
+    // - 整页加载（navigate/reload）且 URL 在 /page/N/（N>1）且无 #latest-articles hash
+    //   → 瞬间定位到 #latest-articles 标题（避免停在 Hero 顶部）
+    // - 第 1 页（/）→ 保持顶部（Hero 即首屏）
+    // - 带 #latest-articles hash → 浏览器原生锚点已处理，不重复干预
+    // - popstate 恢复 → 走上面的 popstate 回调，不在此处理
+    function initHomeScrollPosition() {
+      const currentPage = getPageFromUrl(window.location.pathname);
+      const hasHash = window.location.hash === '#latest-articles';
+      // 仅当 >1 页（/page/2/ 等）且无锚点时定位；第1页保持 Hero 顶部
+      if (currentPage > 1 && !hasHash) {
+        // 首次加载用 instant（瞬间定位），避免首屏长距离平滑滚动。
+        // 关键：不能用 'auto'——CSS scroll-behavior:smooth 会使 'auto'
+        // 变为平滑动画，创建 300ms 窗口，期间 astro:page-load / Astro
+        // onScrollEnd 可能触发并竞争，导致"先到标题再回顶部"的二次滚动。
+        scrollToLatest(true);
+      }
+      // 保存初始滚动位置（供后续 popstate 恢复）
       saveScrollState();
+      homeScrollReady = true;
+    }
+
+    // 使用 requestAnimationFrame 确保布局完成后获取正确 offsetTop / scrollY
+    requestAnimationFrame(() => {
+      initHomeScrollPosition();
     });
   }
 </script>
