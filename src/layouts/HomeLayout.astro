@@ -407,13 +407,14 @@ const appendSiteName = page === 1 ? false : true;
     max-width: var(--width-content, 72rem);
     margin-inline: auto;
     padding-inline: var(--space-xl, 2rem);
-    /* 上大下小：让 Hero 文案整体略微下移，留出更多顶部呼吸空间 */
-    padding-block: 6rem var(--space-3xl, 4rem);
+    /* 上大下小：随视口流式缩放，小屏桌面减少顶部留白避免拥挤 */
+    padding-block: clamp(3rem, 5vw, 6rem) clamp(2rem, 3vw, var(--space-3xl, 4rem));
     /* 左右两栏布局：左侧文字 52%，右侧 Science Map 48% */
     display: grid;
     grid-template-columns: 52% 48%;
     align-items: center;
-    gap: var(--space-2xl, 3rem);
+    /* gap 流式：小屏桌面 24px → 大屏 48px */
+    gap: clamp(1.5rem, 3vw, 3rem);
   }
 
   /* 左侧：标题 + 简介 + 按钮 */
@@ -424,10 +425,12 @@ const appendSiteName = page === 1 ? false : true;
   /* 右侧：Science Map 容器 */
   .home-hero__right {
     width: 100%;
-    height: 380px;
-    /* 限制最大尺寸，避免过大抢占标题空间 */
-    max-width: 480px;
-    max-height: 400px;
+    /* 流式高度：随视口平滑缩放，小屏 320px → 大屏 400px */
+    height: clamp(320px, 28vw, 400px);
+    /* 流式最大宽度：解除固定 480px 限制，让 48% 网格列实际生效，
+     * 但限制上限避免大屏时 ScienceMap 过大抢占标题空间 */
+    max-width: clamp(360px, 40vw, 540px);
+    max-height: 440px;
     margin-inline: auto;
     position: relative;
   }
@@ -437,12 +440,22 @@ const appendSiteName = page === 1 ? false : true;
    * font-display: swap 确保加载前回退系统粗体 */
   .home-hero__title {
     font-family: 'Smiley Sans Oblique', var(--font-display);
-    font-size: clamp(2.75rem, 6vw, 4.25rem); /* 44px ~ 68px */
+    /* 流式字号：1280px≈51px、1366px≈55px、1440px≈58px、1600px≈64px、≥1706px达68px
+     * 原 6vw 在 1133px 即达 max，导致 1280-1536 全为 68px 不缩小 */
+    font-size: clamp(2.25rem, 4vw, 4.25rem); /* 36px ~ 68px */
     font-weight: var(--fw-bold, 700);
     line-height: 1.05; /* 紧凑行距，两行标题贴合 */
     margin: 0;
     display: flex;
     flex-direction: column;
+  }
+
+  /* 标题内嵌的空 <p class="home-hero__desc"> 位于两行标题之间，
+   * 不应继承 .home-hero__desc 的 margin-top，否则制造虚假间距 */
+  .home-hero__title > .home-hero__desc {
+    margin: 0;
+    height: 0;
+    overflow: hidden;
   }
 
   .home-hero__title-line {
@@ -462,7 +475,8 @@ const appendSiteName = page === 1 ? false : true;
 
   /* 简介：灰紫色，保证浅紫背景上的可读性 */
   .home-hero__desc {
-    margin-top: var(--space-xl, 2rem);
+    /* 流式间距：小屏 16px → 大屏 32px */
+    margin-top: clamp(1rem, 2vw, 2rem);
     font-size: var(--fs-base, 1rem);
     line-height: var(--lh-normal, 1.6);
     color: #4a4660;
@@ -473,7 +487,8 @@ const appendSiteName = page === 1 ? false : true;
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-md, 1rem);
-    margin-top: var(--space-2xl, 3rem);
+    /* 流式间距：小屏 24px → 大屏 48px */
+    margin-top: clamp(1.5rem, 3vw, 3rem);
   }
 
   /* 入口按钮 */
@@ -578,15 +593,11 @@ const appendSiteName = page === 1 ? false : true;
     }
   }
 
-  /* 平板端：缩小 Science Map，保持左右布局 */
+  /* 平板端：缩小间距，保持左右布局。
+   * Hero right 尺寸由桌面 clamp() 自然过渡，此处不再覆盖固定值。 */
   @media (max-width: 1024px) {
     .home-hero__inner {
       gap: var(--space-xl, 2rem);
-    }
-
-    .home-hero__right {
-      height: 320px;
-      max-width: 400px;
     }
   }
 
@@ -616,6 +627,7 @@ const appendSiteName = page === 1 ? false : true;
     }
 
     .home-hero__title {
+      /* 移动端用更大 vw 系数，确保小屏标题不会过小 */
       font-size: clamp(2.25rem, 8vw, 3rem);
     }
 
