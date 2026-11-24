@@ -61,6 +61,6 @@ export default defineConfig({
     // 开发工具栏默认开启，便于调试；如需关闭可设为 false。
     enabled: true,
   },
-  site: 'https://arcsysu.github.io',
-  base: '/chaozhi-global-perspectives',
+  site: 'https://insight.yatcc-ai.com',
+  base: '/',
 });
