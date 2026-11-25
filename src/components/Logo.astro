@@ -3,9 +3,8 @@
  * YatCC Logo 组件
  *
  * 说明：
- * - 从原始 yatcc-logo.png 中提取上方的紫粉渐变龙形图案（去除下方 DeepSeek /
- *   NSCC / StarLight 等文字），生成透明背景的独立 Logo（public/yatcc-dragon.png）。
- * - 本组件渲染该龙形图案，右侧由 Header 显示"超智全球视野"文字。
+ * - 使用 public/yatcc-dragon.png（正方形品牌图形，1024×1024）。
+ * - 右侧由 Header 显示「超智全球视野」文字。
  * - 通过 withBase() 引用 public 静态资源，部署到子路径时自动生效。
  *
  * Props:
@@ -19,14 +18,10 @@ interface Props {
   label?: string;
 }
 
-const { size = 50, label = 'YatCC 龙形标志' } = Astro.props;
-// 资源路径修正：原引用 '/yatcc-logo.png'（位于项目根目录，未被 Astro 作为静态资源输出，
-// 导致浏览器请求 404，Logo 加载失败而短暂消失）。改用 public/yatcc-dragon.png，
-// 该文件实际存在且会被 Astro 输出到 dist 根目录。
+const { size = 50, label = '超智全球视野标志' } = Astro.props;
 const logoSrc = withBase('/yatcc-dragon.png');
-// 龙形图实际像素尺寸（587×427，宽高比约 1.376），用于精确计算固定占位宽度，
-// 避免 <img> 加载前后因尺寸属性不一致导致布局位移。
-const LOGO_RATIO = 587 / 427; // ≈ 1.376
+// 正方形 Logo（1024×1024），固定占位宽度避免加载前后布局位移。
+const LOGO_RATIO = 1;
 ---
 
 <span
@@ -39,8 +34,8 @@ const LOGO_RATIO = 587 / 427; // ≈ 1.376
     class="logo__img"
     src={logoSrc}
     alt={label}
-    width="587"
-    height="427"
+    width="1024"
+    height="1024"
     loading="eager"
     decoding="async"
     aria-hidden="true"
@@ -60,11 +55,10 @@ const LOGO_RATIO = 587 / 427; // ≈ 1.376
     flex: 0 0 var(--logo-width);
   }
 
-  /* 龙形图案按高度等比缩放，宽度自动跟随（原图 587×427，宽高比约 1.376） */
+  /* 正方形 Logo 按高度等比缩放 */
   .logo__img {
     height: var(--logo-size);
     width: auto;
-    /* 仅在深色背景上显示时保证对比度；龙形本身为紫粉渐变，无需额外滤镜 */
     display: block;
     object-fit: contain;
   }
