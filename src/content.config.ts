@@ -98,9 +98,9 @@ const articleSchema = z
     /** 封面图（可选）：相对文章文件夹的路径，如 images/cover.webp */
     coverImage: z.string().optional(),
 
-    /** 原始资料来源类型（人工整理文章用）：如 report / press-release / docx 等 */
+    /** 原始资料来源类型：如 report / press-release / research / docx 等 */
     sourceType: z
-      .enum(['report', 'press-release', 'docx', 'web', 'other'])
+      .enum(['report', 'press-release', 'docx', 'web', 'research', 'other'])
       .optional(),
 
     /** 是否为内部参考资料（仅 Demo 用，公开文章不应设置） */

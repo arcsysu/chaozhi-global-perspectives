@@ -50,7 +50,7 @@ src/content/_demo/<slug>/images/cover.svg      ← Demo 图片（可选）
 | `publishedAt` | ISO datetime | approved 时建议 | 发布时间。无此字段的文章不会被公开读取 |
 | `eventDate` | ISO date | 可选 | 原始事件发生日期（仅日期） |
 | `coverImage` | string | 可选 | 相对文章文件夹的路径，如 `images/cover.webp` |
-| `sourceType` | enum | 可选 | `report`/`press-release`/`docx`/`web`/`other` |
+| `sourceType` | enum | 可选 | `report`/`press-release`/`docx`/`web`/`research`/`other` |
 | `internal` | boolean | 可选 | 默认 `false`。仅 Demo 内部资料设为 `true` |
 
 ### 2.2 ISO 8601 日期格式
