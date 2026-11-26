@@ -3,7 +3,7 @@
  * YatCC Logo 组件
  *
  * 说明：
- * - 使用 public/yatcc-dragon.png（正方形品牌图形，1024×1024）。
+ * - 使用 public/deep-purple.svg（正方形流线环带标志，viewBox 1024×1024）。
  * - 右侧由 Header 显示「超智全球视野」文字。
  * - 通过 withBase() 引用 public 静态资源，部署到子路径时自动生效。
  *
@@ -19,7 +19,7 @@ interface Props {
 }
 
 const { size = 50, label = '超智全球视野标志' } = Astro.props;
-const logoSrc = withBase('/yatcc-dragon.png');
+const logoSrc = withBase('/deep-purple.svg');
 // 正方形 Logo（1024×1024），固定占位宽度避免加载前后布局位移。
 const LOGO_RATIO = 1;
 ---

@@ -53,9 +53,8 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? Astro.url);
     <meta name="theme-color" content="#6d4aff" />
 
     <link rel="canonical" href={canonical.href} />
-    <link rel="icon" type="image/png" sizes="32x32" href={withBase('/favicon-32.png')} />
-    <link rel="icon" type="image/png" sizes="64x64" href={withBase('/favicon-64.png')} />
-    <link rel="apple-touch-icon" sizes="180x180" href={withBase('/favicon-180.png')} />
+    <link rel="icon" type="image/svg+xml" href={withBase('/favicon.svg')} />
+    <link rel="apple-touch-icon" href={withBase('/favicon.svg')} />
 
     <!-- Open Graph 基础（静态，后续文章页可覆盖） -->
     <meta property="og:site_name" content={site.name} />
