@@ -2,14 +2,22 @@
 title: 智能体发现更省量子算法，覆盖聚变与药物
 summary: 11月23日，Google DeepMind介绍与Google Quantum AI合作、用Gemini 4智能体团队改进量子算法并在Lean中完成形式验证的研究，论文于11月16日发布。按论文结果，聚变相关模拟时空代价降低11.8倍，光化学与药物代谢模拟分别降低8.22倍和2.49倍，arcsin模块降低290倍。程序库已开源。作者指出，完整科学模拟所需资源仍高于早期纠错量子计算机可提供的水平。
 tags:
-  - 量子算法
-  - DeepMind
-  - Gemini
-  - Lean
-  - 形式验证
-  - 聚变
-  - 药物设计
-  - AI for Science
+  科学智能体:
+    - Gemini
+  项目跟踪: []
+  实施主体:
+    企业:
+      - Google DeepMind
+      - Google Quantum AI
+    超级计算机: []
+    研究机构: []
+    高校: []
+    政府机构: []
+    学会: []
+  科学领域:
+    - 量子算法
+    - 聚变
+    - 药物设计
 articleSource: agent
 status: approved
 agent: Grok Bot
