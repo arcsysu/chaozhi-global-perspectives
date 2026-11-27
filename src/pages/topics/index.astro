@@ -383,11 +383,15 @@ const totalSubjects = allTagStats.length;
     /* 二级栏宽按最长标签（研究机构/政府机构）定，栏内左对齐 → 左线齐平 */
     --subject-sub-rail: 4.75rem;
     --subject-sub-gap: 0.9rem;
+    /* 所有一级共用同一探出宽度，保证「主体」与其它一级左缘对齐 */
+    --subject-hang: calc(
+      var(--subject-cat-rail) + var(--subject-cat-gap) + var(--subject-sub-rail) +
+        var(--subject-sub-gap)
+    );
     min-width: 0;
   }
 
   .subject-category {
-    --subject-hang: calc(var(--subject-cat-rail) + var(--subject-cat-gap));
     display: grid;
     grid-template-columns: var(--subject-cat-rail) minmax(0, 1fr);
     column-gap: var(--subject-cat-gap);
@@ -411,27 +415,25 @@ const totalSubjects = allTagStats.length;
     /* 与 .subject-entry 的 padding-block 对齐，使标题顶线贴齐首条标签名 */
     margin: 0;
     padding-top: 0.72rem;
+    color: var(--color-heading);
     line-height: 1.45;
+    text-align: left;
   }
 
-  /* 一级：左对齐；品牌色 + 稍大字重，和下级、页标题都区分开 */
+  /* 一级：更大字号 + 半粗，靠字体体现层级（与二级同色） */
   .subject-category__title {
-    color: var(--color-brand);
     font-size: 1.28rem;
     font-weight: var(--fw-semibold);
     letter-spacing: 0.04em;
-    text-align: left;
   }
 
   .subject-category__body {
     min-width: 0;
   }
 
-  .subject-category--nested {
-    --subject-hang: calc(
-      var(--subject-cat-rail) + var(--subject-cat-gap) + var(--subject-sub-rail) +
-        var(--subject-sub-gap)
-    );
+  /* 无二级的类别：为二级栏留空，使条目仍与搜索框左缘对齐 */
+  .subject-category:not(.subject-category--nested) .subject-category__body {
+    padding-left: calc(var(--subject-sub-rail) + var(--subject-sub-gap));
   }
 
   .subject-subcategory {
@@ -451,13 +453,11 @@ const totalSubjects = allTagStats.length;
     display: none;
   }
 
-  /* 二级：弱一档的字号/字重/颜色，体现从属 */
+  /* 二级：更小字号 + 常规字重，同色靠字体体现从属 */
   .subject-subcategory__title {
-    color: var(--color-text-muted);
     font-size: 1.02rem;
-    font-weight: var(--fw-medium);
+    font-weight: var(--fw-regular);
     letter-spacing: 0.02em;
-    text-align: left;
   }
 
   .subject-subcategory__body {
@@ -696,6 +696,10 @@ const totalSubjects = allTagStats.length;
       margin-left: 0;
       width: 100%;
       column-gap: 0;
+    }
+
+    .subject-category:not(.subject-category--nested) .subject-category__body {
+      padding-left: 0;
     }
 
     .subject-category__title,

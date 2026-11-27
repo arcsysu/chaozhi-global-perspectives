@@ -26,7 +26,7 @@ export type ArticleEntry = CollectionEntry<'articles'>;
 export type DemoEntry = CollectionEntry<'demo'>;
 
 /** 标签类别（固定顺序） */
-export const TAG_CATEGORY_ORDER = ['科学智能体', '项目', '主体', '领域'] as const;
+export const TAG_CATEGORY_ORDER = ['科学智能体', '项目', '领域', '主体'] as const;
 export type TagCategory = (typeof TAG_CATEGORY_ORDER)[number];
 
 /** 主体子类（固定顺序） */
@@ -86,10 +86,13 @@ export function flattenTags(tags: CategorizedTags): string[] {
     seen.add(tag);
     result.push(tag);
   };
-  for (const tag of tags.科学智能体 ?? []) push(tag);
-  for (const tag of tags.项目 ?? []) push(tag);
-  for (const tag of flattenSubjectTags(tags.主体 ?? emptySubjectTags())) push(tag);
-  for (const tag of tags.领域 ?? []) push(tag);
+  for (const category of TAG_CATEGORY_ORDER) {
+    if (category === '主体') {
+      for (const tag of flattenSubjectTags(tags.主体 ?? emptySubjectTags())) push(tag);
+      continue;
+    }
+    for (const tag of tags[category] ?? []) push(tag);
+  }
   return result;
 }
 
