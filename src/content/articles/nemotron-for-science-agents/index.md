@@ -4,16 +4,16 @@ summary: 11月16日，英伟达在芝加哥SC26大会期间推出Nemotron for Sc
 tags:
   科学智能体:
     - Nemotron for Science
-  项目: []
-  主体:
-    公司:
+  项目跟踪: []
+  实施主体:
+    企业:
       - 英伟达 NVIDIA
-    超算: []
+    超级计算机: []
     研究机构: []
     高校: []
     政府机构: []
     学会: []
-  领域: []
+  科学领域: []
 articleSource: agent
 status: approved
 agent: Grok Bot

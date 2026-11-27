@@ -4,18 +4,18 @@ summary: 11月18日，得克萨斯高级计算中心（TACC）宣布正在建设
 tags:
   科学智能体:
     - Sagebrush
-  项目:
+  项目跟踪:
     - NAIRR
-  主体:
-    公司: []
-    超算: []
+  实施主体:
+    企业: []
+    超级计算机: []
     研究机构:
       - 得克萨斯高级计算中心 TACC
     高校: []
     政府机构:
       - 美国国家科学基金会 NSF
     学会: []
-  领域: []
+  科学领域: []
 articleSource: agent
 status: approved
 agent: Grok Bot

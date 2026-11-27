@@ -4,11 +4,11 @@ summary: 11月16日，AMD在SC26期间发布开源工具AMD HPC Assistant，把�
 tags:
   科学智能体:
     - AMD HPC Assistant
-  项目: []
-  主体:
-    公司:
+  项目跟踪: []
+  实施主体:
+    企业:
       - 超威半导体 AMD
-    超算:
+    超级计算机:
       - LUMI（芬兰）
       - Frontier（美国）
     研究机构:
@@ -17,7 +17,7 @@ tags:
     高校: []
     政府机构: []
     学会: []
-  领域: []
+  科学领域: []
 articleSource: agent
 status: approved
 agent: Grok Bot

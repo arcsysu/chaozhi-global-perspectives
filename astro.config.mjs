@@ -1,28 +1,81 @@
 import { defineConfig } from 'astro/config';
+import { createReadStream, existsSync, statSync } from 'node:fs';
 import { cp, readdir } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // ────────────────────────────────────────────────────────────
-// 文章图片复制集成（零第三方依赖）
+// 文章图片复制 / 开发态静态映射（零第三方依赖）
 //
 // frontmatter 的 coverImage 按约定解析为 /articles/<slug>/<path>
 // （见 src/utils/articles.ts 的 resolveCoverImage），但 Astro 静态构建
-// 不会自动把 src/content/ 下的文件复制进 dist。此集成在构建完成后将每篇
-// 文章文件夹内的 images/ 复制到 dist/articles/<slug>/images/，
-// 使线上封面路径可访问。
+// 不会自动把 src/content/ 下的文件复制进 dist。此集成：
+// 1) 构建完成后把每篇文章 images/ 复制到 dist/articles/<slug>/images/
+// 2) 开发服务器把 /articles/<slug>/images/* 映射回 src/content/articles/
 // ────────────────────────────────────────────────────────────
+const MIME_BY_EXT = {
+  '.webp': 'image/webp',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.svg': 'image/svg+xml',
+  '.avif': 'image/avif',
+};
+
 function copyArticleImages() {
+  const articlesRoot = fileURLToPath(new URL('./src/content/articles/', import.meta.url));
+
   return {
     name: 'copy-article-images',
     hooks: {
+      'astro:config:setup': ({ updateConfig, logger }) => {
+        updateConfig({
+          vite: {
+            plugins: [
+              {
+                name: 'serve-article-images-dev',
+                configureServer(server) {
+                  server.middlewares.use((req, res, next) => {
+                    const rawUrl = req.url?.split('?')[0] ?? '';
+                    const match = rawUrl.match(/^\/articles\/([^/]+)\/images\/(.+)$/);
+                    if (!match) return next();
+
+                    const slug = decodeURIComponent(match[1]);
+                    const relPath = decodeURIComponent(match[2]);
+                    // 禁止路径穿越：只允许读 articles/<slug>/images 下的文件
+                    const imagesRoot = path.resolve(articlesRoot, slug, 'images');
+                    const filePath = path.resolve(imagesRoot, relPath);
+                    if (!filePath.startsWith(imagesRoot + path.sep) && filePath !== imagesRoot) {
+                      res.statusCode = 403;
+                      res.end('Forbidden');
+                      return;
+                    }
+                    if (!existsSync(filePath) || !statSync(filePath).isFile()) {
+                      return next();
+                    }
+
+                    const ext = path.extname(filePath).toLowerCase();
+                    res.setHeader('Content-Type', MIME_BY_EXT[ext] ?? 'application/octet-stream');
+                    res.setHeader('Cache-Control', 'no-cache');
+                    createReadStream(filePath).pipe(res);
+                  });
+                  logger.info('Dev middleware: /articles/<slug>/images/* → src/content/articles');
+                },
+              },
+            ],
+          },
+        });
+      },
       'astro:build:done': async ({ dir, logger }) => {
-        const articlesRoot = new URL('./src/content/articles/', import.meta.url);
+        const articlesRootUrl = new URL('./src/content/articles/', import.meta.url);
         const outDir = dir.href.endsWith('/') ? dir : new URL(`${dir.href}/`);
         let copied = 0;
-        for (const entry of await readdir(articlesRoot, { withFileTypes: true })) {
+        for (const entry of await readdir(articlesRootUrl, { withFileTypes: true })) {
           if (!entry.isDirectory()) continue;
           try {
             await cp(
-              new URL(`./${entry.name}/images/`, articlesRoot),
+              new URL(`./${entry.name}/images/`, articlesRootUrl),
               new URL(`./articles/${entry.name}/images/`, outDir),
               { recursive: true },
             );

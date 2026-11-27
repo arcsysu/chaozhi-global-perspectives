@@ -49,43 +49,45 @@ const articleSchema = z
 
     /**
      * 分类标签：四键对象，空类别保留 []。
-     * 类别顺序：科学智能体 → 项目 → 领域 → 主体。
-     * 主体再分为：公司 / 超算 / 研究机构 / 高校 / 政府机构 / 学会。
-     * 至少一类（含主体任一子类）非空。
+     * 类别顺序：科学智能体 → 项目跟踪 → 科学领域 → 实施主体。
+     * 实施主体再分为：企业 / 超级计算机 / 研究机构 / 高校 / 政府机构 / 学会。
+     * 至少一类（含实施主体任一子类）非空。
      */
     tags: z
       .object({
         科学智能体: z.array(z.string().min(1)).default([]),
-        项目: z.array(z.string().min(1)).default([]),
-        主体: z
+        项目跟踪: z.array(z.string().min(1)).default([]),
+        实施主体: z
           .object({
-            公司: z.array(z.string().min(1)).default([]),
-            超算: z.array(z.string().min(1)).default([]),
+            企业: z.array(z.string().min(1)).default([]),
+            超级计算机: z.array(z.string().min(1)).default([]),
             研究机构: z.array(z.string().min(1)).default([]),
             高校: z.array(z.string().min(1)).default([]),
             政府机构: z.array(z.string().min(1)).default([]),
             学会: z.array(z.string().min(1)).default([]),
           })
           .default({
-            公司: [],
-            超算: [],
+            企业: [],
+            超级计算机: [],
             研究机构: [],
             高校: [],
             政府机构: [],
             学会: [],
           }),
-        领域: z.array(z.string().min(1)).default([]),
+        科学领域: z.array(z.string().min(1)).default([]),
       })
       .refine(
         (t) => {
           const subjectCount =
-            t.主体.公司.length +
-            t.主体.超算.length +
-            t.主体.研究机构.length +
-            t.主体.高校.length +
-            t.主体.政府机构.length +
-            t.主体.学会.length;
-          return t.科学智能体.length + t.项目.length + subjectCount + t.领域.length >= 1;
+            t.实施主体.企业.length +
+            t.实施主体.超级计算机.length +
+            t.实施主体.研究机构.length +
+            t.实施主体.高校.length +
+            t.实施主体.政府机构.length +
+            t.实施主体.学会.length;
+          return (
+            t.科学智能体.length + t.项目跟踪.length + subjectCount + t.科学领域.length >= 1
+          );
         },
         { message: '至少需要一个标签' },
       ),

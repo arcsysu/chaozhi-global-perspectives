@@ -26,13 +26,18 @@ export type ArticleEntry = CollectionEntry<'articles'>;
 export type DemoEntry = CollectionEntry<'demo'>;
 
 /** 标签类别（固定顺序） */
-export const TAG_CATEGORY_ORDER = ['科学智能体', '项目', '领域', '主体'] as const;
+export const TAG_CATEGORY_ORDER = [
+  '科学智能体',
+  '项目跟踪',
+  '科学领域',
+  '实施主体',
+] as const;
 export type TagCategory = (typeof TAG_CATEGORY_ORDER)[number];
 
-/** 主体子类（固定顺序） */
+/** 实施主体子类（固定顺序） */
 export const SUBJECT_SUBCATEGORY_ORDER = [
-  '公司',
-  '超算',
+  '企业',
+  '超级计算机',
   '研究机构',
   '高校',
   '政府机构',
@@ -40,22 +45,22 @@ export const SUBJECT_SUBCATEGORY_ORDER = [
 ] as const;
 export type SubjectSubcategory = (typeof SUBJECT_SUBCATEGORY_ORDER)[number];
 
-/** 主体分类标签（子类空数组保留 []） */
+/** 实施主体分类标签（子类空数组保留 []） */
 export type SubjectTags = Record<SubjectSubcategory, string[]>;
 
-/** 四类分类标签；主体为嵌套子类对象 */
+/** 四类分类标签；实施主体为嵌套子类对象 */
 export type CategorizedTags = {
   科学智能体: string[];
-  项目: string[];
-  主体: SubjectTags;
-  领域: string[];
+  项目跟踪: string[];
+  实施主体: SubjectTags;
+  科学领域: string[];
 };
 
-/** 空主体对象（六子类均为 []） */
+/** 空实施主体对象（六子类均为 []） */
 export function emptySubjectTags(): SubjectTags {
   return {
-    公司: [],
-    超算: [],
+    企业: [],
+    超级计算机: [],
     研究机构: [],
     高校: [],
     政府机构: [],
@@ -63,7 +68,7 @@ export function emptySubjectTags(): SubjectTags {
   };
 }
 
-/** 展平主体子类标签（去重，保序） */
+/** 展平实施主体子类标签（去重，保序） */
 export function flattenSubjectTags(subjects: SubjectTags): string[] {
   const seen = new Set<string>();
   const result: string[] = [];
@@ -77,7 +82,7 @@ export function flattenSubjectTags(subjects: SubjectTags): string[] {
   return result;
 }
 
-/** 按固定类别顺序展平标签（去重，保序）；主体按子类顺序展开 */
+/** 按固定类别顺序展平标签（去重，保序）；实施主体按子类顺序展开 */
 export function flattenTags(tags: CategorizedTags): string[] {
   const seen = new Set<string>();
   const result: string[] = [];
@@ -87,8 +92,8 @@ export function flattenTags(tags: CategorizedTags): string[] {
     result.push(tag);
   };
   for (const category of TAG_CATEGORY_ORDER) {
-    if (category === '主体') {
-      for (const tag of flattenSubjectTags(tags.主体 ?? emptySubjectTags())) push(tag);
+    if (category === '实施主体') {
+      for (const tag of flattenSubjectTags(tags.实施主体 ?? emptySubjectTags())) push(tag);
       continue;
     }
     for (const tag of tags[category] ?? []) push(tag);
@@ -512,7 +517,7 @@ function sortTagStats(entries: Iterable<[string, number]>): TagStat[] {
 
 /**
  * 按四类分区聚合标签统计；各类始终返回（可为空数组）。
- * 主体按子类再分区；类内按文章数降序，同数按 zh-CN 名称排序。
+ * 实施主体按子类再分区；类内按文章数降序，同数按 zh-CN 名称排序。
  */
 export async function getCategorizedTagStats(): Promise<CategoryTagStats[]> {
   const articles = await getMergedThumbnailedArticles();
@@ -531,17 +536,17 @@ export async function getCategorizedTagStats(): Promise<CategoryTagStats[]> {
       const bucket = countsByCategory.get('科学智能体')!;
       bucket.set(tag, (bucket.get(tag) ?? 0) + 1);
     }
-    for (const tag of a.tags.项目 ?? []) {
-      const bucket = countsByCategory.get('项目')!;
+    for (const tag of a.tags.项目跟踪 ?? []) {
+      const bucket = countsByCategory.get('项目跟踪')!;
       bucket.set(tag, (bucket.get(tag) ?? 0) + 1);
     }
-    for (const tag of a.tags.领域 ?? []) {
-      const bucket = countsByCategory.get('领域')!;
+    for (const tag of a.tags.科学领域 ?? []) {
+      const bucket = countsByCategory.get('科学领域')!;
       bucket.set(tag, (bucket.get(tag) ?? 0) + 1);
     }
 
-    const subjects = a.tags.主体 ?? emptySubjectTags();
-    const subjectFlat = countsByCategory.get('主体')!;
+    const subjects = a.tags.实施主体 ?? emptySubjectTags();
+    const subjectFlat = countsByCategory.get('实施主体')!;
     for (const sub of SUBJECT_SUBCATEGORY_ORDER) {
       const bucket = subjectCounts.get(sub)!;
       for (const tag of subjects[sub] ?? []) {
@@ -552,7 +557,7 @@ export async function getCategorizedTagStats(): Promise<CategoryTagStats[]> {
   }
 
   return TAG_CATEGORY_ORDER.map((category) => {
-    if (category === '主体') {
+    if (category === '实施主体') {
       const subcategories = SUBJECT_SUBCATEGORY_ORDER.map((name) => ({
         name,
         tags: sortTagStats(subjectCounts.get(name)!),

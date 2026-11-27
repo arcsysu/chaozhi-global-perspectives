@@ -202,17 +202,17 @@ title: HPC+AI for Science 前沿观察计划正式启动
 summary: ...
 tags:
   科学智能体: []
-  项目:
+  项目跟踪:
     - 前沿观察计划
-  主体:
-    公司: []
-    超算: []
+  实施主体:
+    企业: []
+    超级计算机: []
     研究机构: []
     高校: []
     政府机构: []
     学会:
       - 中国计算机学会 CCF
-  领域: []
+  科学领域: []
 articleSource: curated
 status: approved
 curatedAt: 2026-11-15T09:00:00+08:00
@@ -231,16 +231,16 @@ summary: ...
 tags:
   科学智能体:
     - Nemotron for Science
-  项目: []
-  主体:
-    公司:
+  项目跟踪: []
+  实施主体:
+    企业:
       - 英伟达 NVIDIA
-    超算: []
+    超级计算机: []
     研究机构: []
     高校: []
     政府机构: []
     学会: []
-  领域: []
+  科学领域: []
 articleSource: agent
 status: draft
 agent: gpt-4-research-v1
@@ -256,11 +256,11 @@ title: 美国创世纪计划进展及对我国的启示与建议
 summary: ...
 tags:
   科学智能体: []
-  项目:
+  项目跟踪:
     - 创世纪计划
-  主体:
-    公司: []
-    超算:
+  实施主体:
+    企业: []
+    超级计算机:
       - Lux（美国）
     研究机构:
       - 橡树岭国家实验室 ORNL
@@ -268,7 +268,7 @@ tags:
     政府机构:
       - 美国能源部 DOE
     学会: []
-  领域: []
+  科学领域: []
 articleSource: curated
 status: draft
 curatedAt: 2026-11-13T00:00:00+08:00

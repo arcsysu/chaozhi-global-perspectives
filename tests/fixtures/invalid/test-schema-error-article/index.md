@@ -3,15 +3,15 @@ title: ""
 summary: ""
 tags:
   科学智能体: []
-  项目: []
-  主体:
-    公司: []
-    超算: []
+  项目跟踪: []
+  实施主体:
+    企业: []
+    超级计算机: []
     研究机构: []
     高校: []
     政府机构: []
     学会: []
-  领域: []
+  科学领域: []
 articleSource: curated
 status: draft
 curatedAt: 2026-11-16T00:00:00+08:00
@@ -19,7 +19,7 @@ curatedAt: 2026-11-16T00:00:00+08:00
 
 > **故意违反 Schema 的错误文章 — 用于验证 Zod 校验拦截能力。**
 >
-> 本文件 frontmatter 故意缺失 title、summary，且四类 tags（含主体六子类）均为空数组。
+> 本文件 frontmatter 故意缺失 title、summary，且四类 tags（含实施主体六子类）均为空数组。
 > 预期行为：若被 Content Collection 加载，Astro Content Layer 报 `InvalidContentEntryDataError`，
 > 指出 title: Required、summary: Required、tags: 至少需要一个标签。
 >
