@@ -301,8 +301,8 @@ const totalSubjects = allTagStats.length;
   .subject-layout {
     display: grid;
     grid-template-columns: minmax(14rem, 0.28fr) minmax(0, 0.72fr);
-    /* 加宽列间距，供分类侧栏标题探出（搜索框与标签条目左缘不动） */
-    gap: clamp(6.5rem, 9vw, 9rem);
+    /* 列间距留给二级侧栏探出；一级已改到条目上方 */
+    gap: clamp(5rem, 7vw, 6.5rem);
     padding-top: 2.7rem;
   }
 
@@ -378,28 +378,20 @@ const totalSubjects = allTagStats.length;
   }
 
   .subject-directory {
-    --subject-cat-rail: 7.5rem;
-    --subject-cat-gap: 1.1rem;
     /* 二级栏宽按最长标签（研究机构/政府机构）定，栏内左对齐 → 左线齐平 */
     --subject-sub-rail: 4.75rem;
     --subject-sub-gap: 0.9rem;
-    /* 所有一级共用同一探出宽度，保证「主体」与其它一级左缘对齐 */
-    --subject-hang: calc(
-      var(--subject-cat-rail) + var(--subject-cat-gap) + var(--subject-sub-rail) +
-        var(--subject-sub-gap)
-    );
+    --subject-sub-hang: calc(var(--subject-sub-rail) + var(--subject-sub-gap));
     min-width: 0;
   }
 
   .subject-category {
-    display: grid;
-    grid-template-columns: var(--subject-cat-rail) minmax(0, 1fr);
-    column-gap: var(--subject-cat-gap);
-    align-items: start;
-    /* 标题探入左列间隙；右侧条目列与搜索框左缘对齐 */
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
     margin-top: 2.1rem;
-    margin-left: calc(-1 * var(--subject-hang));
-    width: calc(100% + var(--subject-hang));
+    margin-left: 0;
+    width: 100%;
   }
 
   .subject-category:first-of-type {
@@ -410,16 +402,15 @@ const totalSubjects = allTagStats.length;
     display: none;
   }
 
-  /* 一级：独立成列，左对齐；相对右侧整块垂直居中，不与二级/条目顶线对齐 */
+  /* 一级：单独一行置于标签之上，与搜索框左缘对齐 */
   .subject-category__title {
-    align-self: center;
-    margin: 0;
+    margin: 0 0 0.55rem;
     padding-top: 0;
     color: var(--color-heading);
     font-size: 1.28rem;
     font-weight: var(--fw-semibold);
     letter-spacing: 0.04em;
-    line-height: 1.45;
+    line-height: 1.35;
     text-align: left;
   }
 
@@ -427,18 +418,18 @@ const totalSubjects = allTagStats.length;
     min-width: 0;
   }
 
-  /* 无二级的类别：为二级栏留空，使条目仍与搜索框左缘对齐 */
-  .subject-category:not(.subject-category--nested) .subject-category__body {
-    padding-left: calc(var(--subject-sub-rail) + var(--subject-sub-gap));
+  /* 有二级时：仅条目区探出，二级侧栏贴条目；一级标题仍留在搜索框左缘 */
+  .subject-category--nested .subject-category__body {
+    margin-left: calc(-1 * var(--subject-sub-hang));
+    width: calc(100% + var(--subject-sub-hang));
   }
 
   .subject-subcategory {
     display: grid;
-    /* 固定栏宽贴条目一侧（相对一级更靠右）；栏内左对齐使各二级左线对齐 */
     grid-template-columns: var(--subject-sub-rail) minmax(0, 1fr);
     column-gap: var(--subject-sub-gap);
     align-items: start;
-    margin-top: 1.15rem;
+    margin-top: 0.85rem;
   }
 
   .subject-subcategory:first-of-type {
@@ -449,7 +440,7 @@ const totalSubjects = allTagStats.length;
     display: none;
   }
 
-  /* 二级：仍与首条条目顶线对齐；更小字号体现从属 */
+  /* 二级：侧栏顶线仍对齐首条标签；更小字号体现从属 */
   .subject-subcategory__title {
     margin: 0;
     padding-top: 0.72rem;
@@ -690,32 +681,24 @@ const totalSubjects = allTagStats.length;
       max-width: 22rem;
     }
 
-    /* 单栏时取消探出，避免冲出容器；标题改叠在条目上方 */
-    .subject-category,
-    .subject-category--nested {
-      grid-template-columns: minmax(0, 1fr);
+    /* 单栏时取消二级探出，避免冲出容器 */
+    .subject-category--nested .subject-category__body {
       margin-left: 0;
       width: 100%;
-      column-gap: 0;
-    }
-
-    .subject-category:not(.subject-category--nested) .subject-category__body {
-      padding-left: 0;
     }
 
     .subject-category__title {
-      align-self: start;
-      margin-bottom: 0.45rem;
-    }
-
-    .subject-subcategory__title {
-      padding-top: 0;
-      margin-bottom: 0.35rem;
+      margin-bottom: 0.4rem;
     }
 
     .subject-subcategory {
       grid-template-columns: minmax(0, 1fr);
       column-gap: 0;
+    }
+
+    .subject-subcategory__title {
+      padding-top: 0;
+      margin-bottom: 0.25rem;
     }
   }
 
