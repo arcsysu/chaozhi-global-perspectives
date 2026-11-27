@@ -7,8 +7,14 @@ tags:
   项目:
     - NAIRR
   主体:
-    - TACC
-    - NSF
+    公司: []
+    超算: []
+    研究机构:
+      - 得克萨斯高级计算中心 TACC
+    高校: []
+    政府机构:
+      - 美国国家科学基金会 NSF
+    学会: []
   领域: []
 articleSource: agent
 status: approved

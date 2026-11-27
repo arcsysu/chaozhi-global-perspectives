@@ -110,11 +110,16 @@ async function waitPageLoad(page, timeout = 6000) {
     record('筛选"计划"有结果', filtered.visible.length > 0, `匹配数=${filtered.visible.length}`);
     record('筛选后匹配计数文本正确', filtered.matchCountText === `${filtered.visible.length} 个匹配`,
       `text="${filtered.matchCountText}"`);
-    // 编号在各类内独立从 01 起，不要求跨类别全局连续
+    // 编号在列表容器内独立从 01 起（主体子类 / 普通类别各自连续）
     const numberingOk = await page.evaluate(() => {
-      const categories = [...document.querySelectorAll('[data-subject-category]')].filter((c) => !c.hidden);
-      return categories.every((category) => {
-        const visible = [...category.querySelectorAll('[data-subject-item]')].filter((i) => !i.hidden);
+      const groups = [
+        ...document.querySelectorAll('[data-subject-subcategory]'),
+        ...[...document.querySelectorAll('[data-subject-category]')].filter(
+          (c) => !c.querySelector('[data-subject-subcategory]'),
+        ),
+      ].filter((g) => !g.hidden);
+      return groups.every((group) => {
+        const visible = [...group.querySelectorAll('[data-subject-item]')].filter((i) => !i.hidden);
         return visible.every((item, i) => {
           const number = item.querySelector('[data-subject-number]')?.textContent?.trim() ?? '';
           return number === String(i + 1).padStart(2, '0');
@@ -130,8 +135,8 @@ async function waitPageLoad(page, timeout = 6000) {
     await page.fill('[data-subject-search]', 'nvidia');
     await page.waitForTimeout(350);
     const nvidiaFiltered = await getVisibleSubjects(page);
-    record('小写"nvidia"匹配大写"NVIDIA"',
-      nvidiaFiltered.visible.length === 1 && nvidiaFiltered.visible[0].name === 'NVIDIA',
+    record('小写"nvidia"匹配"英伟达 NVIDIA"',
+      nvidiaFiltered.visible.length === 1 && nvidiaFiltered.visible[0].name.includes('NVIDIA'),
       `visible=${JSON.stringify(nvidiaFiltered.visible)}`);
 
     await page.fill('[data-subject-search]', 'AMD');
@@ -193,9 +198,14 @@ async function waitPageLoad(page, timeout = 6000) {
     record('站内导航后输入筛选有效', navFiltered.visible.length > 0 && navFiltered.visible.length < navState.total,
       `匹配=${navFiltered.visible.length}`);
     const navNumberingOk = await page.evaluate(() => {
-      const categories = [...document.querySelectorAll('[data-subject-category]')].filter((c) => !c.hidden);
-      return categories.every((category) => {
-        const visible = [...category.querySelectorAll('[data-subject-item]')].filter((i) => !i.hidden);
+      const groups = [
+        ...document.querySelectorAll('[data-subject-subcategory]'),
+        ...[...document.querySelectorAll('[data-subject-category]')].filter(
+          (c) => !c.querySelector('[data-subject-subcategory]'),
+        ),
+      ].filter((g) => !g.hidden);
+      return groups.every((group) => {
+        const visible = [...group.querySelectorAll('[data-subject-item]')].filter((i) => !i.hidden);
         return visible.every((item, i) => {
           const number = item.querySelector('[data-subject-number]')?.textContent?.trim() ?? '';
           return number === String(i + 1).padStart(2, '0');
@@ -249,7 +259,7 @@ async function waitPageLoad(page, timeout = 6000) {
     await page.waitForTimeout(350);
     const afterBackFilter = await getVisibleSubjects(page);
     record('后退后搜索功能仍可用',
-      afterBackFilter.visible.length === 1 && afterBackFilter.visible[0].name === 'NVIDIA',
+      afterBackFilter.visible.length === 1 && afterBackFilter.visible[0].name.includes('NVIDIA'),
       `visible=${afterBackFilter.visible.map((v) => v.name).join(',')}`);
 
     await ctx.close();

@@ -6,7 +6,13 @@ tags:
   项目:
     - 前沿观察计划
   主体:
-    - CCF
+    公司: []
+    超算: []
+    研究机构: []
+    高校: []
+    政府机构: []
+    学会:
+      - 中国计算机学会 CCF
   领域: []
 articleSource: curated
 status: approved

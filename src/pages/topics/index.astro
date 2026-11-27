@@ -64,7 +64,7 @@ const totalSubjects = allTagStats.length;
               <p class="empty-state">暂无主题，文章发布后将自动生成。</p>
             ) : (
               <>
-                {categorizedStats.map(({ category, tags }) => (
+                {categorizedStats.map(({ category, tags, subcategories }) => (
                   <section
                     class="subject-category"
                     data-subject-category
@@ -76,6 +76,56 @@ const totalSubjects = allTagStats.length;
                     </h3>
                     {tags.length === 0 ? (
                       <p class="subject-category__empty">暂无主题</p>
+                    ) : subcategories && subcategories.length > 0 ? (
+                      subcategories.map(({ name, tags: subTags }) => (
+                        <div
+                          class="subject-subcategory"
+                          data-subject-subcategory
+                          aria-labelledby={`subject-subcategory-${category}-${name}`}
+                          hidden={subTags.length === 0}
+                        >
+                          <h4
+                            class="subject-subcategory__title"
+                            id={`subject-subcategory-${category}-${name}`}
+                          >
+                            {name}
+                          </h4>
+                          {subTags.length === 0 ? (
+                            <p class="subject-category__empty">暂无主题</p>
+                          ) : (
+                            <ol class="subject-index" role="list">
+                              {subTags.map(({ tag, count }, index) => (
+                                <li
+                                  data-subject-item
+                                  data-subject-name={tag
+                                    .normalize('NFKC')
+                                    .toLocaleLowerCase('zh-CN')}
+                                >
+                                  <a
+                                    href={withBase(`/topics/${encodeURIComponent(tag)}/`)}
+                                    class="subject-entry"
+                                  >
+                                    <span
+                                      class="subject-entry__number"
+                                      data-subject-number
+                                      aria-hidden="true"
+                                    >
+                                      {String(index + 1).padStart(2, '0')}
+                                    </span>
+                                    <span class="subject-entry__name">{tag}</span>
+                                    <span
+                                      class="subject-entry__count"
+                                      aria-label={`${count} 篇文章`}
+                                    >
+                                      {count}
+                                    </span>
+                                  </a>
+                                </li>
+                              ))}
+                            </ol>
+                          )}
+                        </div>
+                      ))
                     ) : (
                       <ol class="subject-index" role="list">
                         {tags.map(({ tag, count }, index) => (
@@ -163,6 +213,24 @@ const totalSubjects = allTagStats.length;
       });
 
       for (const category of categories) {
+        const subcategories = [
+          ...category.querySelectorAll<HTMLElement>('[data-subject-subcategory]'),
+        ];
+        if (subcategories.length > 0) {
+          for (const sub of subcategories) {
+            const visibleItems = [
+              ...sub.querySelectorAll<HTMLElement>('[data-subject-item]'),
+            ].filter((el) => !el.hidden);
+            sub.hidden = visibleItems.length === 0;
+            visibleItems.forEach((item, localIndex) => {
+              const number = item.querySelector<HTMLElement>('[data-subject-number]');
+              if (number) number.textContent = String(localIndex + 1).padStart(2, '0');
+            });
+          }
+          category.hidden = subcategories.every((sub) => sub.hidden);
+          continue;
+        }
+
         const visibleItems = [
           ...category.querySelectorAll<HTMLElement>('[data-subject-item]'),
         ].filter((el) => !el.hidden);
@@ -323,6 +391,26 @@ const totalSubjects = allTagStats.length;
     font-size: 0.72rem;
     font-weight: var(--fw-medium);
     letter-spacing: 0.14em;
+  }
+
+  .subject-subcategory {
+    margin-top: 0.85rem;
+  }
+
+  .subject-subcategory:first-of-type {
+    margin-top: 0.45rem;
+  }
+
+  .subject-subcategory[hidden] {
+    display: none;
+  }
+
+  .subject-subcategory__title {
+    margin: 0 0 0.15rem;
+    color: var(--color-text-muted);
+    font-size: 0.68rem;
+    font-weight: var(--fw-medium);
+    letter-spacing: 0.1em;
   }
 
   .subject-category__empty {

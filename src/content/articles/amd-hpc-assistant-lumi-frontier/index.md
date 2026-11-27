@@ -6,11 +6,17 @@ tags:
     - AMD HPC Assistant
   项目: []
   主体:
-    - AMD
-    - CSC
-    - ORNL
-    - LUMI
-    - Frontier
+    公司:
+      - 超威半导体 AMD
+    超算:
+      - LUMI（芬兰）
+      - Frontier（美国）
+    研究机构:
+      - 芬兰科学信息技术中心 CSC
+      - 橡树岭国家实验室 ORNL
+    高校: []
+    政府机构: []
+    学会: []
   领域: []
 articleSource: agent
 status: approved

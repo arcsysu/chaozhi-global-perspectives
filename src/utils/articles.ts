@@ -29,20 +29,67 @@ export type DemoEntry = CollectionEntry<'demo'>;
 export const TAG_CATEGORY_ORDER = ['科学智能体', '项目', '主体', '领域'] as const;
 export type TagCategory = (typeof TAG_CATEGORY_ORDER)[number];
 
-/** 四类分类标签（空类别保留 []） */
-export type CategorizedTags = Record<TagCategory, string[]>;
+/** 主体子类（固定顺序） */
+export const SUBJECT_SUBCATEGORY_ORDER = [
+  '公司',
+  '超算',
+  '研究机构',
+  '高校',
+  '政府机构',
+  '学会',
+] as const;
+export type SubjectSubcategory = (typeof SUBJECT_SUBCATEGORY_ORDER)[number];
 
-/** 按固定类别顺序展平标签（去重，保序） */
-export function flattenTags(tags: CategorizedTags): string[] {
+/** 主体分类标签（子类空数组保留 []） */
+export type SubjectTags = Record<SubjectSubcategory, string[]>;
+
+/** 四类分类标签；主体为嵌套子类对象 */
+export type CategorizedTags = {
+  科学智能体: string[];
+  项目: string[];
+  主体: SubjectTags;
+  领域: string[];
+};
+
+/** 空主体对象（六子类均为 []） */
+export function emptySubjectTags(): SubjectTags {
+  return {
+    公司: [],
+    超算: [],
+    研究机构: [],
+    高校: [],
+    政府机构: [],
+    学会: [],
+  };
+}
+
+/** 展平主体子类标签（去重，保序） */
+export function flattenSubjectTags(subjects: SubjectTags): string[] {
   const seen = new Set<string>();
   const result: string[] = [];
-  for (const category of TAG_CATEGORY_ORDER) {
-    for (const tag of tags[category] ?? []) {
+  for (const sub of SUBJECT_SUBCATEGORY_ORDER) {
+    for (const tag of subjects[sub] ?? []) {
       if (seen.has(tag)) continue;
       seen.add(tag);
       result.push(tag);
     }
   }
+  return result;
+}
+
+/** 按固定类别顺序展平标签（去重，保序）；主体按子类顺序展开 */
+export function flattenTags(tags: CategorizedTags): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  const push = (tag: string) => {
+    if (seen.has(tag)) return;
+    seen.add(tag);
+    result.push(tag);
+  };
+  for (const tag of tags.科学智能体 ?? []) push(tag);
+  for (const tag of tags.项目 ?? []) push(tag);
+  for (const tag of flattenSubjectTags(tags.主体 ?? emptySubjectTags())) push(tag);
+  for (const tag of tags.领域 ?? []) push(tag);
   return result;
 }
 
@@ -70,10 +117,17 @@ export interface TagStat {
   count: number;
 }
 
-/** 分类标签统计（主题索引页用） */
+/** 主体子类统计 */
+export interface SubjectSubcategoryStats {
+  name: SubjectSubcategory;
+  tags: TagStat[];
+}
+
+/** 分类标签统计（主题索引页用）；主体额外带 subcategories */
 export interface CategoryTagStats {
   category: TagCategory;
   tags: TagStat[];
+  subcategories?: SubjectSubcategoryStats[];
 }
 
 /** 归档树节点 */
@@ -447,32 +501,69 @@ export async function getTagStats(): Promise<TagStat[]> {
     .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag, 'zh-CN'));
 }
 
+function sortTagStats(entries: Iterable<[string, number]>): TagStat[] {
+  return [...entries]
+    .map(([tag, count]) => ({ tag, count }))
+    .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag, 'zh-CN'));
+}
+
 /**
  * 按四类分区聚合标签统计；各类始终返回（可为空数组）。
- * 类内按文章数降序，同数按 zh-CN 名称排序。
+ * 主体按子类再分区；类内按文章数降序，同数按 zh-CN 名称排序。
  */
 export async function getCategorizedTagStats(): Promise<CategoryTagStats[]> {
   const articles = await getMergedThumbnailedArticles();
   const countsByCategory = new Map<TagCategory, Map<string, number>>();
+  const subjectCounts = new Map<SubjectSubcategory, Map<string, number>>();
+
   for (const category of TAG_CATEGORY_ORDER) {
     countsByCategory.set(category, new Map());
   }
+  for (const sub of SUBJECT_SUBCATEGORY_ORDER) {
+    subjectCounts.set(sub, new Map());
+  }
 
   for (const a of articles) {
-    for (const category of TAG_CATEGORY_ORDER) {
-      const bucket = countsByCategory.get(category)!;
-      for (const tag of a.tags[category] ?? []) {
+    for (const tag of a.tags.科学智能体 ?? []) {
+      const bucket = countsByCategory.get('科学智能体')!;
+      bucket.set(tag, (bucket.get(tag) ?? 0) + 1);
+    }
+    for (const tag of a.tags.项目 ?? []) {
+      const bucket = countsByCategory.get('项目')!;
+      bucket.set(tag, (bucket.get(tag) ?? 0) + 1);
+    }
+    for (const tag of a.tags.领域 ?? []) {
+      const bucket = countsByCategory.get('领域')!;
+      bucket.set(tag, (bucket.get(tag) ?? 0) + 1);
+    }
+
+    const subjects = a.tags.主体 ?? emptySubjectTags();
+    const subjectFlat = countsByCategory.get('主体')!;
+    for (const sub of SUBJECT_SUBCATEGORY_ORDER) {
+      const bucket = subjectCounts.get(sub)!;
+      for (const tag of subjects[sub] ?? []) {
         bucket.set(tag, (bucket.get(tag) ?? 0) + 1);
+        subjectFlat.set(tag, (subjectFlat.get(tag) ?? 0) + 1);
       }
     }
   }
 
   return TAG_CATEGORY_ORDER.map((category) => {
-    const bucket = countsByCategory.get(category)!;
-    const tags = [...bucket.entries()]
-      .map(([tag, count]) => ({ tag, count }))
-      .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag, 'zh-CN'));
-    return { category, tags };
+    if (category === '主体') {
+      const subcategories = SUBJECT_SUBCATEGORY_ORDER.map((name) => ({
+        name,
+        tags: sortTagStats(subjectCounts.get(name)!),
+      }));
+      return {
+        category,
+        tags: sortTagStats(countsByCategory.get(category)!),
+        subcategories,
+      };
+    }
+    return {
+      category,
+      tags: sortTagStats(countsByCategory.get(category)!),
+    };
   });
 }
 

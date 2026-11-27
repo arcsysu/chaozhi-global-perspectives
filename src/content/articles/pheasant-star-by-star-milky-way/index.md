@@ -7,9 +7,17 @@ tags:
     - PHEASANT
     - 戈登贝尔奖
   主体:
-    - Aurora
-    - Frontier
-    - JUPITER
+    公司: []
+    超算:
+      - Aurora（美国）
+      - Frontier（美国）
+      - JUPITER Booster（德国）
+    研究机构:
+      - 理化学研究所 RIKEN
+    高校:
+      - 东京大学
+    政府机构: []
+    学会: []
   领域:
     - 天文模拟
 articleSource: agent

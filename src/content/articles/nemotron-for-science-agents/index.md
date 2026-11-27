@@ -6,7 +6,13 @@ tags:
     - Nemotron for Science
   项目: []
   主体:
-    - NVIDIA
+    公司:
+      - 英伟达 NVIDIA
+    超算: []
+    研究机构: []
+    高校: []
+    政府机构: []
+    学会: []
   领域: []
 articleSource: agent
 status: approved

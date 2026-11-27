@@ -41,7 +41,7 @@ src/content/_demo/<slug>/images/cover.svg      ← Demo 图片（可选）
 | --- | --- | --- | --- |
 | `title` | string | 必填 | 文章标题，非空 |
 | `summary` | string | 必填 | 摘要，非空，建议 80–200 字 |
-| `tags` | 分类对象 | 必填（合计 ≥1） | 四键：`科学智能体` / `项目` / `主体` / `领域`；空类别写 `[]`；各类内为自由字符串数组 |
+| `tags` | 分类对象 | 必填（合计 ≥1） | 四键：`科学智能体` / `项目` / `主体` / `领域`。`主体` 再分 `公司`/`超算`/`研究机构`/`高校`/`政府机构`/`学会`；空键写 `[]`。机构宜用「中文名+英文缩写」；超算宜加「（国家）」 |
 | `articleSource` | `'agent' \| 'curated'` | 必填 | 默认 `agent`。来源类型 |
 | `status` | `'draft' \| 'approved'` | 必填 | 默认 `draft`。审核状态 |
 | `agent` | string | agent 时必填 | Agent 名称/版本。curated 时**禁止**填写 |
@@ -205,7 +205,13 @@ tags:
   项目:
     - 前沿观察计划
   主体:
-    - CCF
+    公司: []
+    超算: []
+    研究机构: []
+    高校: []
+    政府机构: []
+    学会:
+      - 中国计算机学会 CCF
   领域: []
 articleSource: curated
 status: approved
@@ -227,7 +233,13 @@ tags:
     - Nemotron for Science
   项目: []
   主体:
-    - NVIDIA
+    公司:
+      - 英伟达 NVIDIA
+    超算: []
+    研究机构: []
+    高校: []
+    政府机构: []
+    学会: []
   领域: []
 articleSource: agent
 status: draft
@@ -247,7 +259,15 @@ tags:
   项目:
     - 创世纪计划
   主体:
-    - DOE
+    公司: []
+    超算:
+      - Lux（美国）
+    研究机构:
+      - 橡树岭国家实验室 ORNL
+    高校: []
+    政府机构:
+      - 美国能源部 DOE
+    学会: []
   领域: []
 articleSource: curated
 status: draft

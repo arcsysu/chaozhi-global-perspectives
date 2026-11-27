@@ -7,8 +7,14 @@ tags:
     - ElMerFold
     - 戈登贝尔奖
   主体:
-    - LLNL
-    - El Capitan
+    公司: []
+    超算:
+      - El Capitan（美国）
+    研究机构:
+      - 劳伦斯利弗莫尔国家实验室 LLNL
+    高校: []
+    政府机构: []
+    学会: []
   领域:
     - 生物医药
 articleSource: agent

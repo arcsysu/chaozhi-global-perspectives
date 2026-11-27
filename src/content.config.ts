@@ -50,18 +50,43 @@ const articleSchema = z
     /**
      * 分类标签：四键对象，空类别保留 []。
      * 类别顺序：科学智能体 → 项目 → 主体 → 领域。
-     * 至少一类非空。
+     * 主体再分为：公司 / 超算 / 研究机构 / 高校 / 政府机构 / 学会。
+     * 至少一类（含主体任一子类）非空。
      */
     tags: z
       .object({
         科学智能体: z.array(z.string().min(1)).default([]),
         项目: z.array(z.string().min(1)).default([]),
-        主体: z.array(z.string().min(1)).default([]),
+        主体: z
+          .object({
+            公司: z.array(z.string().min(1)).default([]),
+            超算: z.array(z.string().min(1)).default([]),
+            研究机构: z.array(z.string().min(1)).default([]),
+            高校: z.array(z.string().min(1)).default([]),
+            政府机构: z.array(z.string().min(1)).default([]),
+            学会: z.array(z.string().min(1)).default([]),
+          })
+          .default({
+            公司: [],
+            超算: [],
+            研究机构: [],
+            高校: [],
+            政府机构: [],
+            学会: [],
+          }),
         领域: z.array(z.string().min(1)).default([]),
       })
       .refine(
-        (t) =>
-          t.科学智能体.length + t.项目.length + t.主体.length + t.领域.length >= 1,
+        (t) => {
+          const subjectCount =
+            t.主体.公司.length +
+            t.主体.超算.length +
+            t.主体.研究机构.length +
+            t.主体.高校.length +
+            t.主体.政府机构.length +
+            t.主体.学会.length;
+          return t.科学智能体.length + t.项目.length + subjectCount + t.领域.length >= 1;
+        },
         { message: '至少需要一个标签' },
       ),
 

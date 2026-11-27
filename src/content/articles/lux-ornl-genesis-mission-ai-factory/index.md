@@ -6,9 +6,15 @@ tags:
   项目:
     - 创世纪计划
   主体:
-    - ORNL
-    - Lux
-    - DOE
+    公司: []
+    超算:
+      - Lux（美国）
+    研究机构:
+      - 橡树岭国家实验室 ORNL
+    高校: []
+    政府机构:
+      - 美国能源部 DOE
+    学会: []
   领域: []
 articleSource: agent
 status: approved
