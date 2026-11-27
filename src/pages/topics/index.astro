@@ -66,7 +66,10 @@ const totalSubjects = allTagStats.length;
               <>
                 {categorizedStats.map(({ category, tags, subcategories }) => (
                   <section
-                    class="subject-category"
+                    class:list={[
+                      'subject-category',
+                      subcategories && subcategories.length > 0 && 'subject-category--nested',
+                    ]}
                     data-subject-category
                     aria-labelledby={`subject-category-${category}`}
                     hidden={tags.length === 0}
@@ -74,85 +77,89 @@ const totalSubjects = allTagStats.length;
                     <h3 class="subject-category__title" id={`subject-category-${category}`}>
                       {category}
                     </h3>
-                    {tags.length === 0 ? (
-                      <p class="subject-category__empty">暂无主题</p>
-                    ) : subcategories && subcategories.length > 0 ? (
-                      subcategories.map(({ name, tags: subTags }) => (
-                        <div
-                          class="subject-subcategory"
-                          data-subject-subcategory
-                          aria-labelledby={`subject-subcategory-${category}-${name}`}
-                          hidden={subTags.length === 0}
-                        >
-                          <h4
-                            class="subject-subcategory__title"
-                            id={`subject-subcategory-${category}-${name}`}
+                    <div class="subject-category__body">
+                      {tags.length === 0 ? (
+                        <p class="subject-category__empty">暂无主题</p>
+                      ) : subcategories && subcategories.length > 0 ? (
+                        subcategories.map(({ name, tags: subTags }) => (
+                          <div
+                            class="subject-subcategory"
+                            data-subject-subcategory
+                            aria-labelledby={`subject-subcategory-${category}-${name}`}
+                            hidden={subTags.length === 0}
                           >
-                            {name}
-                          </h4>
-                          {subTags.length === 0 ? (
-                            <p class="subject-category__empty">暂无主题</p>
-                          ) : (
-                            <ol class="subject-index" role="list">
-                              {subTags.map(({ tag, count }, index) => (
-                                <li
-                                  data-subject-item
-                                  data-subject-name={tag
-                                    .normalize('NFKC')
-                                    .toLocaleLowerCase('zh-CN')}
-                                >
-                                  <a
-                                    href={withBase(`/topics/${encodeURIComponent(tag)}/`)}
-                                    class="subject-entry"
-                                  >
-                                    <span
-                                      class="subject-entry__number"
-                                      data-subject-number
-                                      aria-hidden="true"
-                                    >
-                                      {String(index + 1).padStart(2, '0')}
-                                    </span>
-                                    <span class="subject-entry__name">{tag}</span>
-                                    <span
-                                      class="subject-entry__count"
-                                      aria-label={`${count} 篇文章`}
-                                    >
-                                      {count}
-                                    </span>
-                                  </a>
-                                </li>
-                              ))}
-                            </ol>
-                          )}
-                        </div>
-                      ))
-                    ) : (
-                      <ol class="subject-index" role="list">
-                        {tags.map(({ tag, count }, index) => (
-                          <li
-                            data-subject-item
-                            data-subject-name={tag.normalize('NFKC').toLocaleLowerCase('zh-CN')}
-                          >
-                            <a
-                              href={withBase(`/topics/${encodeURIComponent(tag)}/`)}
-                              class="subject-entry"
+                            <h4
+                              class="subject-subcategory__title"
+                              id={`subject-subcategory-${category}-${name}`}
                             >
-                              <span
-                                class="subject-entry__number"
-                                data-subject-number
-                                aria-hidden="true"
+                              {name}
+                            </h4>
+                            <div class="subject-subcategory__body">
+                              {subTags.length === 0 ? (
+                                <p class="subject-category__empty">暂无主题</p>
+                              ) : (
+                                <ol class="subject-index" role="list">
+                                  {subTags.map(({ tag, count }, index) => (
+                                    <li
+                                      data-subject-item
+                                      data-subject-name={tag
+                                        .normalize('NFKC')
+                                        .toLocaleLowerCase('zh-CN')}
+                                    >
+                                      <a
+                                        href={withBase(`/topics/${encodeURIComponent(tag)}/`)}
+                                        class="subject-entry"
+                                      >
+                                        <span
+                                          class="subject-entry__number"
+                                          data-subject-number
+                                          aria-hidden="true"
+                                        >
+                                          {String(index + 1).padStart(2, '0')}
+                                        </span>
+                                        <span class="subject-entry__name">{tag}</span>
+                                        <span
+                                          class="subject-entry__count"
+                                          aria-label={`${count} 篇文章`}
+                                        >
+                                          {count}
+                                        </span>
+                                      </a>
+                                    </li>
+                                  ))}
+                                </ol>
+                              )}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <ol class="subject-index" role="list">
+                          {tags.map(({ tag, count }, index) => (
+                            <li
+                              data-subject-item
+                              data-subject-name={tag.normalize('NFKC').toLocaleLowerCase('zh-CN')}
+                            >
+                              <a
+                                href={withBase(`/topics/${encodeURIComponent(tag)}/`)}
+                                class="subject-entry"
                               >
-                                {String(index + 1).padStart(2, '0')}
-                              </span>
-                              <span class="subject-entry__name">{tag}</span>
-                              <span class="subject-entry__count" aria-label={`${count} 篇文章`}>
-                                {count}
-                              </span>
-                            </a>
-                          </li>
-                        ))}
-                      </ol>
-                    )}
+                                <span
+                                  class="subject-entry__number"
+                                  data-subject-number
+                                  aria-hidden="true"
+                                >
+                                  {String(index + 1).padStart(2, '0')}
+                                </span>
+                                <span class="subject-entry__name">{tag}</span>
+                                <span class="subject-entry__count" aria-label={`${count} 篇文章`}>
+                                  {count}
+                                </span>
+                              </a>
+                            </li>
+                          ))}
+                        </ol>
+                      )}
+                    </div>
                   </section>
                 ))}
                 <p class="subject-directory__empty" data-empty-result hidden>
@@ -374,31 +381,55 @@ const totalSubjects = allTagStats.length;
   }
 
   .subject-category {
-    margin-top: 1.75rem;
+    display: grid;
+    grid-template-columns: 6.5rem minmax(0, 1fr);
+    column-gap: 1.25rem;
+    align-items: start;
+    margin-top: 2.1rem;
   }
 
   .subject-category:first-of-type {
-    margin-top: 1.1rem;
+    margin-top: 1.35rem;
   }
 
   .subject-category[hidden] {
     display: none;
   }
 
+  .subject-category__title,
+  .subject-subcategory__title {
+    /* 与 .subject-entry 的 padding-block 对齐，使标题顶线贴齐首条标签名 */
+    margin: 0;
+    padding-top: 0.72rem;
+    line-height: 1.45;
+  }
+
   .subject-category__title {
-    margin: 0 0 0.35rem;
     color: var(--color-brand);
-    font-size: 0.72rem;
-    font-weight: var(--fw-medium);
-    letter-spacing: 0.14em;
+    font-size: 1.12rem;
+    font-weight: var(--fw-semibold);
+    letter-spacing: -0.02em;
+  }
+
+  .subject-category__body {
+    min-width: 0;
+  }
+
+  .subject-category--nested {
+    grid-template-columns: 3.75rem minmax(0, 1fr);
+    column-gap: 1rem;
   }
 
   .subject-subcategory {
-    margin-top: 0.85rem;
+    display: grid;
+    grid-template-columns: 4.75rem minmax(0, 1fr);
+    column-gap: 1rem;
+    align-items: start;
+    margin-top: 1.15rem;
   }
 
   .subject-subcategory:first-of-type {
-    margin-top: 0.45rem;
+    margin-top: 0;
   }
 
   .subject-subcategory[hidden] {
@@ -406,11 +437,14 @@ const totalSubjects = allTagStats.length;
   }
 
   .subject-subcategory__title {
-    margin: 0 0 0.15rem;
-    color: var(--color-text-muted);
-    font-size: 0.68rem;
+    color: var(--color-text);
+    font-size: 0.95rem;
     font-weight: var(--fw-medium);
-    letter-spacing: 0.1em;
+    letter-spacing: 0.01em;
+  }
+
+  .subject-subcategory__body {
+    min-width: 0;
   }
 
   .subject-category__empty {
@@ -684,6 +718,31 @@ const totalSubjects = allTagStats.length;
 
     .subject-search {
       min-height: 3.4rem;
+    }
+
+    .subject-category {
+      grid-template-columns: 4.75rem minmax(0, 1fr);
+      column-gap: 0.75rem;
+      margin-top: 1.7rem;
+    }
+
+    .subject-category--nested {
+      grid-template-columns: 3rem minmax(0, 1fr);
+      column-gap: 0.65rem;
+    }
+
+    .subject-category__title {
+      font-size: 1rem;
+    }
+
+    .subject-subcategory {
+      grid-template-columns: 3.75rem minmax(0, 1fr);
+      column-gap: 0.55rem;
+      margin-top: 0.95rem;
+    }
+
+    .subject-subcategory__title {
+      font-size: 0.88rem;
     }
 
     .subject-index {
