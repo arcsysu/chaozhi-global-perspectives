@@ -301,7 +301,7 @@ const totalSubjects = allTagStats.length;
   .subject-layout {
     display: grid;
     grid-template-columns: minmax(14rem, 0.28fr) minmax(0, 0.72fr);
-    gap: clamp(3.5rem, 6vw, 5rem);
+    gap: clamp(2.75rem, 5vw, 4rem);
     padding-top: 2.7rem;
   }
 
@@ -378,6 +378,8 @@ const totalSubjects = allTagStats.length;
 
   .subject-directory {
     min-width: 0;
+    /* 整体稍往左靠，缩短与左栏间距 */
+    margin-left: clamp(-1.75rem, -2.2vw, -1rem);
   }
 
   .subject-category {
@@ -396,11 +398,12 @@ const totalSubjects = allTagStats.length;
     display: none;
   }
 
-  /* 一级：置于标签之上，居中 */
+  /* 一级：置于标签之上，居中；微软雅黑 */
   .subject-category__title {
     margin: 0 0 0.55rem;
     color: var(--color-heading);
-    font-size: 1.28rem;
+    font-family: 'Microsoft YaHei', '微软雅黑', sans-serif;
+    font-size: 1.45rem;
     font-weight: var(--fw-semibold);
     letter-spacing: 0.04em;
     line-height: 1.35;
@@ -426,12 +429,13 @@ const totalSubjects = allTagStats.length;
     display: none;
   }
 
-  /* 二级：一级之下、标签之上，左对齐 */
+  /* 二级：一级之下、标签之上，左对齐；等线 Light + 加粗 */
   .subject-subcategory__title {
     margin: 0 0 0.35rem;
     color: var(--color-heading);
+    font-family: 'DengXian Light', '等线 Light', DengXian, '等线', sans-serif;
     font-size: 1.02rem;
-    font-weight: var(--fw-regular);
+    font-weight: var(--fw-bold);
     letter-spacing: 0.02em;
     line-height: 1.35;
     text-align: left;
@@ -691,6 +695,10 @@ const totalSubjects = allTagStats.length;
       padding-top: 1.7rem;
     }
 
+    .subject-directory {
+      margin-left: 0;
+    }
+
     .editorial-panel {
       grid-template-columns: minmax(0, 1fr);
     }
@@ -727,7 +735,7 @@ const totalSubjects = allTagStats.length;
     }
 
     .subject-category__title {
-      font-size: 1.15rem;
+      font-size: 1.3rem;
     }
 
     .subject-subcategory {
