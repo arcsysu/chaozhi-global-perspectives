@@ -4,7 +4,7 @@ summary: LLNL 团队在超算 El Capitan 上，把约 4100 万个蛋白质结构
 tags:
   科学智能体: []
   项目跟踪:
-    - ElMerFold
+    - 蛋白质结构蒸馏工作流 ElMerFold
     - 戈登贝尔奖
   实施主体:
     企业: []
