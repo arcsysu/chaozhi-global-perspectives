@@ -380,7 +380,8 @@ const totalSubjects = allTagStats.length;
   .subject-directory {
     --subject-cat-rail: 7.5rem;
     --subject-cat-gap: 1.1rem;
-    --subject-sub-rail: 5rem;
+    /* 二级栏宽按最长标签（研究机构/政府机构）定，栏内左对齐 → 左线齐平 */
+    --subject-sub-rail: 4.75rem;
     --subject-sub-gap: 0.9rem;
     min-width: 0;
   }
@@ -410,15 +411,16 @@ const totalSubjects = allTagStats.length;
     /* 与 .subject-entry 的 padding-block 对齐，使标题顶线贴齐首条标签名 */
     margin: 0;
     padding-top: 0.72rem;
-    color: var(--color-heading);
-    font-weight: var(--fw-bold);
-    letter-spacing: -0.02em;
     line-height: 1.45;
-    text-align: right;
   }
 
+  /* 一级：左对齐；品牌色 + 稍大字重，和下级、页标题都区分开 */
   .subject-category__title {
-    font-size: 1.4rem;
+    color: var(--color-brand);
+    font-size: 1.28rem;
+    font-weight: var(--fw-semibold);
+    letter-spacing: 0.04em;
+    text-align: left;
   }
 
   .subject-category__body {
@@ -434,6 +436,7 @@ const totalSubjects = allTagStats.length;
 
   .subject-subcategory {
     display: grid;
+    /* 固定栏宽贴条目一侧（相对一级更靠右）；栏内左对齐使各二级左线对齐 */
     grid-template-columns: var(--subject-sub-rail) minmax(0, 1fr);
     column-gap: var(--subject-sub-gap);
     align-items: start;
@@ -448,8 +451,13 @@ const totalSubjects = allTagStats.length;
     display: none;
   }
 
+  /* 二级：弱一档的字号/字重/颜色，体现从属 */
   .subject-subcategory__title {
-    font-size: 1.2rem;
+    color: var(--color-text-muted);
+    font-size: 1.02rem;
+    font-weight: var(--fw-medium);
+    letter-spacing: 0.02em;
+    text-align: left;
   }
 
   .subject-subcategory__body {
@@ -694,7 +702,6 @@ const totalSubjects = allTagStats.length;
     .subject-subcategory__title {
       padding-top: 0;
       margin-bottom: 0.35rem;
-      text-align: left;
     }
 
     .subject-subcategory {
@@ -755,7 +762,7 @@ const totalSubjects = allTagStats.length;
     }
 
     .subject-category__title {
-      font-size: 1.25rem;
+      font-size: 1.15rem;
     }
 
     .subject-subcategory {
@@ -763,7 +770,7 @@ const totalSubjects = allTagStats.length;
     }
 
     .subject-subcategory__title {
-      font-size: 1.1rem;
+      font-size: 0.95rem;
     }
 
     .subject-index {
