@@ -410,21 +410,17 @@ const totalSubjects = allTagStats.length;
     display: none;
   }
 
-  .subject-category__title,
-  .subject-subcategory__title {
-    /* 与 .subject-entry 的 padding-block 对齐，使标题顶线贴齐首条标签名 */
-    margin: 0;
-    padding-top: 0.72rem;
-    color: var(--color-heading);
-    line-height: 1.45;
-    text-align: left;
-  }
-
-  /* 一级：更大字号 + 半粗，靠字体体现层级（与二级同色） */
+  /* 一级：独立成列，左对齐；相对右侧整块垂直居中，不与二级/条目顶线对齐 */
   .subject-category__title {
+    align-self: center;
+    margin: 0;
+    padding-top: 0;
+    color: var(--color-heading);
     font-size: 1.28rem;
     font-weight: var(--fw-semibold);
     letter-spacing: 0.04em;
+    line-height: 1.45;
+    text-align: left;
   }
 
   .subject-category__body {
@@ -453,11 +449,16 @@ const totalSubjects = allTagStats.length;
     display: none;
   }
 
-  /* 二级：更小字号 + 常规字重，同色靠字体体现从属 */
+  /* 二级：仍与首条条目顶线对齐；更小字号体现从属 */
   .subject-subcategory__title {
+    margin: 0;
+    padding-top: 0.72rem;
+    color: var(--color-heading);
     font-size: 1.02rem;
     font-weight: var(--fw-regular);
     letter-spacing: 0.02em;
+    line-height: 1.45;
+    text-align: left;
   }
 
   .subject-subcategory__body {
@@ -702,7 +703,11 @@ const totalSubjects = allTagStats.length;
       padding-left: 0;
     }
 
-    .subject-category__title,
+    .subject-category__title {
+      align-self: start;
+      margin-bottom: 0.45rem;
+    }
+
     .subject-subcategory__title {
       padding-top: 0;
       margin-bottom: 0.35rem;
