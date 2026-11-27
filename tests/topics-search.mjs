@@ -104,30 +104,46 @@ async function waitPageLoad(page, timeout = 6000) {
     record('初始无结果提示隐藏', initial.emptyHidden === true, `emptyHidden=${initial.emptyHidden}`);
 
     section('2. 输入即实时筛选 — 中文名匹配');
-    await page.fill('[data-subject-search]', '测试');
+    await page.fill('[data-subject-search]', '计划');
     await page.waitForTimeout(350);
     const filtered = await getVisibleSubjects(page);
-    record('筛选"测试"有结果', filtered.visible.length > 0, `匹配数=${filtered.visible.length}`);
+    record('筛选"计划"有结果', filtered.visible.length > 0, `匹配数=${filtered.visible.length}`);
     record('筛选后匹配计数文本正确', filtered.matchCountText === `${filtered.visible.length} 个匹配`,
       `text="${filtered.matchCountText}"`);
-    record('筛选后编号重新连续排列',
-      filtered.visible.every((v, i) => v.number.trim() === String(i + 1).padStart(2, '0')),
+    // 编号在列表容器内独立从 01 起（主体子类 / 普通类别各自连续）
+    const numberingOk = await page.evaluate(() => {
+      const groups = [
+        ...document.querySelectorAll('[data-subject-subcategory]'),
+        ...[...document.querySelectorAll('[data-subject-category]')].filter(
+          (c) => !c.querySelector('[data-subject-subcategory]'),
+        ),
+      ].filter((g) => !g.hidden);
+      return groups.every((group) => {
+        const visible = [...group.querySelectorAll('[data-subject-item]')].filter((i) => !i.hidden);
+        return visible.every((item, i) => {
+          const number = item.querySelector('[data-subject-number]')?.textContent?.trim() ?? '';
+          return number === String(i + 1).padStart(2, '0');
+        });
+      });
+    });
+    record('筛选后各类内编号重新连续排列', numberingOk,
       `numbers=${filtered.visible.map((v) => v.number.trim()).join(',')}`);
     record('筛选后隐藏了不匹配项', filtered.hiddenCount > 0, `hidden=${filtered.hiddenCount}`);
     record('筛选后无结果提示隐藏（有匹配时）', filtered.emptyHidden === true, `emptyHidden=${filtered.emptyHidden}`);
 
     section('3. 不区分大小写匹配 — 英文 tag');
-    await page.fill('[data-subject-search]', 'hpc');
+    await page.fill('[data-subject-search]', 'nvidia');
     await page.waitForTimeout(350);
-    const hpcFiltered = await getVisibleSubjects(page);
-    record('小写"hpc"匹配大写"HPC"', hpcFiltered.visible.length === 1 && hpcFiltered.visible[0].name === 'HPC',
-      `visible=${JSON.stringify(hpcFiltered.visible)}`);
+    const nvidiaFiltered = await getVisibleSubjects(page);
+    record('小写"nvidia"匹配"英伟达 NVIDIA"',
+      nvidiaFiltered.visible.length === 1 && nvidiaFiltered.visible[0].name.includes('NVIDIA'),
+      `visible=${JSON.stringify(nvidiaFiltered.visible)}`);
 
-    await page.fill('[data-subject-search]', 'AI');
+    await page.fill('[data-subject-search]', 'AMD');
     await page.waitForTimeout(350);
-    const aiFiltered = await getVisibleSubjects(page);
-    record('大写"AI"匹配"AI for Science"', aiFiltered.visible.some((v) => v.name.includes('AI')),
-      `visible=${aiFiltered.visible.map((v) => v.name).join(',')}`);
+    const amdFiltered = await getVisibleSubjects(page);
+    record('大写"AMD"匹配含 AMD 的主题', amdFiltered.visible.some((v) => v.name.includes('AMD')),
+      `visible=${amdFiltered.visible.map((v) => v.name).join(',')}`);
 
     section('4. 清空后恢复全部主题');
     await page.fill('[data-subject-search]', '');
@@ -176,13 +192,27 @@ async function waitPageLoad(page, timeout = 6000) {
       `total=${navState.total}`);
 
     // 站内导航后输入筛选
-    await page.fill('[data-subject-search]', '测试');
+    await page.fill('[data-subject-search]', '计划');
     await page.waitForTimeout(350);
     const navFiltered = await getVisibleSubjects(page);
     record('站内导航后输入筛选有效', navFiltered.visible.length > 0 && navFiltered.visible.length < navState.total,
       `匹配=${navFiltered.visible.length}`);
-    record('站内导航后编号重新排列',
-      navFiltered.visible.every((v, i) => v.number.trim() === String(i + 1).padStart(2, '0')),
+    const navNumberingOk = await page.evaluate(() => {
+      const groups = [
+        ...document.querySelectorAll('[data-subject-subcategory]'),
+        ...[...document.querySelectorAll('[data-subject-category]')].filter(
+          (c) => !c.querySelector('[data-subject-subcategory]'),
+        ),
+      ].filter((g) => !g.hidden);
+      return groups.every((group) => {
+        const visible = [...group.querySelectorAll('[data-subject-item]')].filter((i) => !i.hidden);
+        return visible.every((item, i) => {
+          const number = item.querySelector('[data-subject-number]')?.textContent?.trim() ?? '';
+          return number === String(i + 1).padStart(2, '0');
+        });
+      });
+    });
+    record('站内导航后各类内编号重新排列', navNumberingOk,
       `numbers=${navFiltered.visible.map((v) => v.number.trim()).join(',')}`);
 
     await ctx.close();
@@ -200,7 +230,7 @@ async function waitPageLoad(page, timeout = 6000) {
     await page.goto(TOPICS_URL, { waitUntil: 'networkidle' });
     await page.waitForTimeout(500);
     // 输入筛选后导航到文章页再返回
-    await page.fill('[data-subject-search]', '超智');
+    await page.fill('[data-subject-search]', '创世纪');
     await page.waitForTimeout(350);
     const beforeNav = await getVisibleSubjects(page);
     record('后退前筛选有效', beforeNav.visible.length > 0, `匹配=${beforeNav.visible.length}`);
@@ -225,10 +255,11 @@ async function waitPageLoad(page, timeout = 6000) {
     const afterBack = await getVisibleSubjects(page);
     record('后退回主题页列表完整', afterBack.total > 0, `total=${afterBack.total}`);
     // 后退后搜索框可能被重置（ClientRouter 恢复 DOM），验证搜索功能仍可用
-    await page.fill('[data-subject-search]', 'HPC');
+    await page.fill('[data-subject-search]', 'NVIDIA');
     await page.waitForTimeout(350);
     const afterBackFilter = await getVisibleSubjects(page);
-    record('后退后搜索功能仍可用', afterBackFilter.visible.length === 1 && afterBackFilter.visible[0].name === 'HPC',
+    record('后退后搜索功能仍可用',
+      afterBackFilter.visible.length === 1 && afterBackFilter.visible[0].name.includes('NVIDIA'),
       `visible=${afterBackFilter.visible.map((v) => v.name).join(',')}`);
 
     await ctx.close();
@@ -244,10 +275,13 @@ async function waitPageLoad(page, timeout = 6000) {
     section('8. 筛选后保持杂志式双栏布局');
     await page.goto(TOPICS_URL, { waitUntil: 'networkidle' });
     await page.waitForTimeout(500);
-    await page.fill('[data-subject-search]', '测试');
+    await page.fill('[data-subject-search]', '计划');
     await page.waitForTimeout(350);
     const layout = await page.evaluate(() => {
-      const grid = document.querySelector('.subject-index');
+      const grid = [...document.querySelectorAll('.subject-index')].find((el) => {
+        const category = el.closest('[data-subject-category]');
+        return category && !category.hidden;
+      }) ?? document.querySelector('.subject-index');
       const cs = grid ? window.getComputedStyle(grid) : null;
       return {
         gridTemplateColumns: cs?.gridTemplateColumns ?? '',
@@ -272,14 +306,17 @@ async function waitPageLoad(page, timeout = 6000) {
     const mobileInitial = await getVisibleSubjects(page);
     record('移动端主题列表完整', mobileInitial.total > 0, `total=${mobileInitial.total}`);
 
-    await page.fill('[data-subject-search]', '测试');
+    await page.fill('[data-subject-search]', '计划');
     await page.waitForTimeout(350);
     const mobileFiltered = await getVisibleSubjects(page);
     record('移动端筛选有效', mobileFiltered.visible.length > 0 && mobileFiltered.visible.length < mobileInitial.total,
       `匹配=${mobileFiltered.visible.length}`);
 
     const mobileLayout = await page.evaluate(() => {
-      const grid = document.querySelector('.subject-index');
+      const grid = [...document.querySelectorAll('.subject-index')].find((el) => {
+        const category = el.closest('[data-subject-category]');
+        return category && !category.hidden;
+      }) ?? document.querySelector('.subject-index');
       const cs = grid ? window.getComputedStyle(grid) : null;
       return cs ? cs.gridTemplateColumns.split(' ').filter(Boolean).length : 0;
     });

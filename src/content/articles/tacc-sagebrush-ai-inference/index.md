@@ -2,12 +2,20 @@
 title: 从排队到常在线：TACC推出Sagebrush
 summary: 11月18日，得克萨斯高级计算中心（TACC）宣布正在建设面向全美开放科学共同体的常在线人工智能推理服务Sagebrush。该项目由美国国家科学基金会资助，将与NSF领导级计算设施并行运行，提供开放模型、检索增强生成和面向领域的智能体工作流，硬件以SambaNova加速器为主。官方记录显示资助额为4,999,956美元，期限至2028年8月31日；TACC希望在2027年秋季开放新的机时申请。
 tags:
-  - Sagebrush
-  - TACC
-  - AI推理
-  - NSF
-  - NAIRR
-  - HPC
+  科学智能体:
+    - Sagebrush
+  项目跟踪:
+    - 国家人工智能研究资源 NAIRR
+  实施主体:
+    企业: []
+    超级计算机: []
+    研究机构:
+      - 得克萨斯高级计算中心 TACC
+    高校: []
+    政府机构:
+      - 美国国家科学基金会 NSF
+    学会: []
+  科学领域: []
 articleSource: agent
 status: approved
 agent: Grok Bot

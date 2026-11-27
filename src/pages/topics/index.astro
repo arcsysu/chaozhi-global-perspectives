@@ -2,10 +2,12 @@
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import Container from '@/components/Container.astro';
 import '@/styles/page.css';
-import { getTagStats } from '@/utils/articles';
+import { getCategorizedTagStats, getTagStats } from '@/utils/articles';
 import { withBase } from '@/utils/site';
 
-const tagStats = await getTagStats();
+const categorizedStats = await getCategorizedTagStats();
+const allTagStats = await getTagStats();
+const totalSubjects = allTagStats.length;
 ---
 
 <BaseLayout
@@ -26,7 +28,7 @@ const tagStats = await getTagStats();
           <p class="editorial-panel__intro">从计算技术到科学发现。</p>
 
           <div class="editorial-panel__archive">
-            <p class="editorial-panel__total">{String(tagStats.length).padStart(3, '0')}</p>
+            <p class="editorial-panel__total">{String(totalSubjects).padStart(3, '0')}</p>
             <p class="editorial-panel__label">SUBJECTS IN ARCHIVE</p>
           </div>
 
@@ -37,7 +39,7 @@ const tagStats = await getTagStats();
         <section class="subject-directory" aria-labelledby="subject-directory-title">
           <div class="subject-directory__heading">
             <h2 id="subject-directory-title">ALL SUBJECTS</h2>
-            <p>按文章数量排序</p>
+            <p>按类别分区 · 类内按文章数排序</p>
           </div>
 
           <label class="subject-search">
@@ -53,29 +55,116 @@ const tagStats = await getTagStats();
               data-subject-search
             />
             <span class="subject-search__count" data-match-count aria-live="polite">
-              {tagStats.length} 个匹配
+              {totalSubjects} 个匹配
             </span>
           </label>
 
           {
-            tagStats.length === 0 ? (
+            totalSubjects === 0 ? (
               <p class="empty-state">暂无主题，文章发布后将自动生成。</p>
             ) : (
               <>
-                <ol class="subject-index" role="list" data-subject-index>
-                  {tagStats.map(({ tag, count }, index) => (
-                    <li data-subject-item data-subject-name={tag.normalize('NFKC').toLocaleLowerCase('zh-CN')}>
-                      <a href={withBase(`/topics/${encodeURIComponent(tag)}/`)} class="subject-entry">
-                        <span class="subject-entry__number" data-subject-number aria-hidden="true">
-                          {String(index + 1).padStart(2, '0')}
-                        </span>
-                        <span class="subject-entry__name">{tag}</span>
-                        <span class="subject-entry__count" aria-label={`${count} 篇文章`}>{count}</span>
-                      </a>
-                    </li>
-                  ))}
-                </ol>
-                <p class="subject-directory__empty" data-empty-result hidden>没有找到匹配的主题</p>
+                {categorizedStats.map(({ category, tags, subcategories }) => (
+                  <section
+                    class:list={[
+                      'subject-category',
+                      subcategories && subcategories.length > 0 && 'subject-category--nested',
+                    ]}
+                    data-subject-category
+                    aria-labelledby={`subject-category-${category}`}
+                    hidden={tags.length === 0}
+                  >
+                    <h3 class="subject-category__title" id={`subject-category-${category}`}>
+                      {category}
+                    </h3>
+                    <div class="subject-category__body">
+                      {tags.length === 0 ? (
+                        <p class="subject-category__empty">暂无主题</p>
+                      ) : subcategories && subcategories.length > 0 ? (
+                        subcategories.map(({ name, tags: subTags }) => (
+                          <div
+                            class="subject-subcategory"
+                            data-subject-subcategory
+                            aria-labelledby={`subject-subcategory-${category}-${name}`}
+                            hidden={subTags.length === 0}
+                          >
+                            <h4
+                              class="subject-subcategory__title"
+                              id={`subject-subcategory-${category}-${name}`}
+                            >
+                              {name}
+                            </h4>
+                            <div class="subject-subcategory__body">
+                              {subTags.length === 0 ? (
+                                <p class="subject-category__empty">暂无主题</p>
+                              ) : (
+                                <ol class="subject-index" role="list">
+                                  {subTags.map(({ tag, count }, index) => (
+                                    <li
+                                      data-subject-item
+                                      data-subject-name={tag
+                                        .normalize('NFKC')
+                                        .toLocaleLowerCase('zh-CN')}
+                                    >
+                                      <a
+                                        href={withBase(`/topics/${encodeURIComponent(tag)}/`)}
+                                        class="subject-entry"
+                                      >
+                                        <span
+                                          class="subject-entry__number"
+                                          data-subject-number
+                                          aria-hidden="true"
+                                        >
+                                          {String(index + 1).padStart(2, '0')}
+                                        </span>
+                                        <span class="subject-entry__name">{tag}</span>
+                                        <span
+                                          class="subject-entry__count"
+                                          aria-label={`${count} 篇文章`}
+                                        >
+                                          {count}
+                                        </span>
+                                      </a>
+                                    </li>
+                                  ))}
+                                </ol>
+                              )}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <ol class="subject-index" role="list">
+                          {tags.map(({ tag, count }, index) => (
+                            <li
+                              data-subject-item
+                              data-subject-name={tag.normalize('NFKC').toLocaleLowerCase('zh-CN')}
+                            >
+                              <a
+                                href={withBase(`/topics/${encodeURIComponent(tag)}/`)}
+                                class="subject-entry"
+                              >
+                                <span
+                                  class="subject-entry__number"
+                                  data-subject-number
+                                  aria-hidden="true"
+                                >
+                                  {String(index + 1).padStart(2, '0')}
+                                </span>
+                                <span class="subject-entry__name">{tag}</span>
+                                <span class="subject-entry__count" aria-label={`${count} 篇文章`}>
+                                  {count}
+                                </span>
+                              </a>
+                            </li>
+                          ))}
+                        </ol>
+                      )}
+                    </div>
+                  </section>
+                ))}
+                <p class="subject-directory__empty" data-empty-result hidden>
+                  没有找到匹配的主题
+                </p>
               </>
             )
           }
@@ -104,6 +193,7 @@ const tagStats = await getTagStats();
     const input = page.querySelector<HTMLInputElement>('[data-subject-search]');
     const count = page.querySelector<HTMLElement>('[data-match-count]');
     const empty = page.querySelector<HTMLElement>('[data-empty-result]');
+    const categories = [...page.querySelectorAll<HTMLElement>('[data-subject-category]')];
     const items = [...page.querySelectorAll<HTMLElement>('[data-subject-item]')];
     if (!input || !count) return;
 
@@ -111,32 +201,55 @@ const tagStats = await getTagStats();
       value.normalize('NFKC').trim().replace(/\s+/g, ' ').toLocaleLowerCase('zh-CN');
 
     // 预计算每个 item 的匹配文本（规范化 tag 名 + 显示名），避免每次输入重复计算。
-    // 显示名取自 .subject-entry__name，包含主题的原始中/英文名称（如 "AI for Science"）。
     const itemMatchTexts = items.map((item) => {
       const tagName = normalize(item.dataset.subjectName ?? '');
       const displayName = normalize(
         item.querySelector<HTMLElement>('.subject-entry__name')?.textContent ?? '',
       );
-      // 合并去重（tag 名与显示名可能重复，如纯中文主题）
       return `${tagName} ${displayName}`;
     });
 
     const filterSubjects = () => {
       const query = normalize(input.value);
-      let visibleIndex = 0;
+      let visibleCount = 0;
 
       items.forEach((item, index) => {
         const isMatch = !query || itemMatchTexts[index].includes(query);
         item.hidden = !isMatch;
-        if (!isMatch) return;
-
-        visibleIndex += 1;
-        const number = item.querySelector<HTMLElement>('[data-subject-number]');
-        if (number) number.textContent = String(visibleIndex).padStart(2, '0');
+        if (isMatch) visibleCount += 1;
       });
 
-      count.textContent = `${visibleIndex} 个匹配`;
-      if (empty) empty.hidden = visibleIndex !== 0;
+      for (const category of categories) {
+        const subcategories = [
+          ...category.querySelectorAll<HTMLElement>('[data-subject-subcategory]'),
+        ];
+        if (subcategories.length > 0) {
+          for (const sub of subcategories) {
+            const visibleItems = [
+              ...sub.querySelectorAll<HTMLElement>('[data-subject-item]'),
+            ].filter((el) => !el.hidden);
+            sub.hidden = visibleItems.length === 0;
+            visibleItems.forEach((item, localIndex) => {
+              const number = item.querySelector<HTMLElement>('[data-subject-number]');
+              if (number) number.textContent = String(localIndex + 1).padStart(2, '0');
+            });
+          }
+          category.hidden = subcategories.every((sub) => sub.hidden);
+          continue;
+        }
+
+        const visibleItems = [
+          ...category.querySelectorAll<HTMLElement>('[data-subject-item]'),
+        ].filter((el) => !el.hidden);
+        category.hidden = visibleItems.length === 0;
+        visibleItems.forEach((item, localIndex) => {
+          const number = item.querySelector<HTMLElement>('[data-subject-number]');
+          if (number) number.textContent = String(localIndex + 1).padStart(2, '0');
+        });
+      }
+
+      count.textContent = `${visibleCount} 个匹配`;
+      if (empty) empty.hidden = visibleCount !== 0;
     };
 
     input.addEventListener('input', filterSubjects);
@@ -188,7 +301,7 @@ const tagStats = await getTagStats();
   .subject-layout {
     display: grid;
     grid-template-columns: minmax(14rem, 0.28fr) minmax(0, 0.72fr);
-    gap: clamp(3.5rem, 6vw, 5rem);
+    gap: clamp(2.75rem, 5vw, 4rem);
     padding-top: 2.7rem;
   }
 
@@ -265,6 +378,79 @@ const tagStats = await getTagStats();
 
   .subject-directory {
     min-width: 0;
+    /* 整体稍往左靠，缩短与左栏间距 */
+    margin-left: clamp(-1.75rem, -2.2vw, -1rem);
+  }
+
+  .subject-category {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    margin-top: 2.1rem;
+    width: 100%;
+  }
+
+  .subject-category:first-of-type {
+    margin-top: 1.35rem;
+  }
+
+  .subject-category[hidden] {
+    display: none;
+  }
+
+  /* 一级：置于标签之上，居中；微软雅黑 */
+  .subject-category__title {
+    margin: 0 0 0.55rem;
+    color: var(--color-heading);
+    font-family: 'Microsoft YaHei', '微软雅黑', sans-serif;
+    font-size: 1.8rem;
+    font-weight: var(--fw-semibold);
+    letter-spacing: 0.04em;
+    line-height: 1.35;
+    text-align: center;
+  }
+
+  .subject-category__body {
+    min-width: 0;
+  }
+
+  .subject-subcategory {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    margin-top: 1rem;
+  }
+
+  .subject-subcategory:first-of-type {
+    margin-top: 0;
+  }
+
+  .subject-subcategory[hidden] {
+    display: none;
+  }
+
+  /* 二级：一级之下、标签之上，左对齐；等线 Light + 加粗 */
+  .subject-subcategory__title {
+    margin: 0 0 0.35rem;
+    color: var(--color-heading);
+    font-family: 'Microsoft YaHei', '微软雅黑', sans-serif;
+    font-size: 1.2rem;
+    font-weight: var(--fw-semibold);
+    letter-spacing: 0.02em;
+    line-height: 1.35;
+    text-align: left;
+  }
+
+  .subject-subcategory__body {
+    min-width: 0;
+  }
+
+  .subject-category__empty {
+    margin: 0;
+    padding-block: 0.9rem;
+    border-bottom: 1px solid var(--color-border);
+    color: var(--color-text-muted);
+    font-size: var(--fs-sm);
   }
 
   .subject-directory__heading {
@@ -483,6 +669,14 @@ const tagStats = await getTagStats();
     .editorial-panel__note {
       max-width: 22rem;
     }
+
+    .subject-category__title {
+      margin-bottom: 0.4rem;
+    }
+
+    .subject-subcategory__title {
+      margin-bottom: 0.25rem;
+    }
   }
 
   @media (max-width: 620px) {
@@ -499,6 +693,10 @@ const tagStats = await getTagStats();
     .subject-layout {
       gap: 2rem;
       padding-top: 1.7rem;
+    }
+
+    .subject-directory {
+      margin-left: 0;
     }
 
     .editorial-panel {
@@ -530,6 +728,22 @@ const tagStats = await getTagStats();
 
     .subject-search {
       min-height: 3.4rem;
+    }
+
+    .subject-category {
+      margin-top: 1.7rem;
+    }
+
+    .subject-category__title {
+      font-size: 1.3rem;
+    }
+
+    .subject-subcategory {
+      margin-top: 0.95rem;
+    }
+
+    .subject-subcategory__title {
+      font-size: 0.95rem;
     }
 
     .subject-index {

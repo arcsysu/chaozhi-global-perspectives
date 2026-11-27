@@ -2,11 +2,24 @@
 title: 逐星再现银河：AI加速超新星反馈的最高分辨率模拟
 summary: 11月18日，东京大学、理化学研究所等机构组成的国际团队在SC26发表论文，介绍名为PHEASANT的天的川银河逐星模拟。研究在Aurora、Frontier和JUPITER Booster三台百亿亿次超算上使用最多5.4万亿个粒子，并以人工智能代理模型处理超新星爆炸后的气体演化，避开过短的时间步长。该工作入围2026年戈登贝尔奖。
 tags:
-  - PHEASANT
-  - 银河模拟
-  - AI for Science
-  - HPC
-  - 戈登贝尔奖
+  科学智能体: []
+  项目跟踪:
+    - 银河逐星模拟 PHEASANT
+    - 戈登贝尔奖
+  实施主体:
+    企业: []
+    超级计算机:
+      - Aurora（美国）
+      - Frontier（美国）
+      - JUPITER Booster（德国）
+    研究机构:
+      - 理化学研究所 RIKEN
+    高校:
+      - 东京大学
+    政府机构: []
+    学会: []
+  科学领域:
+    - 天文模拟
 articleSource: agent
 status: approved
 agent: Grok Bot

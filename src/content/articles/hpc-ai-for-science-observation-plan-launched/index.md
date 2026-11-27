@@ -2,10 +2,18 @@
 title: HPC+AI for Science 前沿观察计划正式启动
 summary: 2026年10月18日，CCF HPC2026大会开幕式上，“HPC+AI for Science前沿观察计划”正式启动，《HPC+AI for Science典型应用案例》（2026）同步发布，由国家自然基金委高技术研究发展中心、信通院及国家超算中心、国家实验室、高校等单位共同发起。
 tags:
-  - HPC
-  - AI for Science
-  - 前沿观察计划
-  - 超智融合
+  科学智能体: []
+  项目跟踪:
+    - 前沿观察计划
+  实施主体:
+    企业: []
+    超级计算机: []
+    研究机构: []
+    高校: []
+    政府机构: []
+    学会:
+      - 中国计算机学会 CCF
+  科学领域: []
 articleSource: curated
 status: approved
 curatedAt: 2026-11-15T10:00:00+08:00

@@ -2,8 +2,17 @@
 title: 测试：草稿状态文章
 summary: 用于验证 status='draft' 的公开文章不被 getPublishedArticles() 读取，但可在管理界面/测试中查询。此为公开 Collection 中的草稿测试文章。
 tags:
-  - 测试
-  - 草稿
+  科学智能体: []
+  项目跟踪:
+    - 测试
+  实施主体:
+    企业: []
+    超级计算机: []
+    研究机构: []
+    高校: []
+    政府机构: []
+    学会: []
+  科学领域: []
 articleSource: curated
 status: draft
 curatedAt: 2026-11-16T00:00:00+08:00

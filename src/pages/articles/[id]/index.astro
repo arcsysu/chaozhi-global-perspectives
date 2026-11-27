@@ -18,6 +18,7 @@
 import { render } from 'astro:content';
 import ArticleLayout from '@/layouts/ArticleLayout.astro';
 import {
+  flattenTags,
   getPublishedArticles,
   getArticleById,
   getNextArticle,
@@ -77,7 +78,7 @@ const publishedAtIso = (data.publishedAt as Date | undefined)?.toISOString() ?? 
 const meta: ArticleHeadMeta = {
   title: data.title,
   summary: data.summary,
-  tags: data.tags,
+  tags: flattenTags(data.tags),
   articleSource: data.articleSource,
   agent: data.agent,
   sourceTimeLabel: formatTime(sourceTime),

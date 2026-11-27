@@ -47,11 +47,50 @@ const articleSchema = z
     /** 摘要（必填） */
     summary: z.string().min(1, 'summary 不能为空'),
 
-    /** 标签：自由字符串数组，不预设枚举，允许任意主题 */
+    /**
+     * 分类标签：四键对象，空类别保留 []。
+     * 类别顺序：科学智能体 → 项目跟踪 → 科学领域 → 实施主体。
+     * 实施主体再分为：企业 / 超级计算机 / 研究机构 / 高校 / 政府机构 / 学会。
+     * 至少一类（含实施主体任一子类）非空。
+     */
     tags: z
-      .array(z.string().min(1))
-      .min(1, '至少需要一个标签')
-      .default([]),
+      .object({
+        科学智能体: z.array(z.string().min(1)).default([]),
+        项目跟踪: z.array(z.string().min(1)).default([]),
+        实施主体: z
+          .object({
+            企业: z.array(z.string().min(1)).default([]),
+            超级计算机: z.array(z.string().min(1)).default([]),
+            研究机构: z.array(z.string().min(1)).default([]),
+            高校: z.array(z.string().min(1)).default([]),
+            政府机构: z.array(z.string().min(1)).default([]),
+            学会: z.array(z.string().min(1)).default([]),
+          })
+          .default({
+            企业: [],
+            超级计算机: [],
+            研究机构: [],
+            高校: [],
+            政府机构: [],
+            学会: [],
+          }),
+        科学领域: z.array(z.string().min(1)).default([]),
+      })
+      .refine(
+        (t) => {
+          const subjectCount =
+            t.实施主体.企业.length +
+            t.实施主体.超级计算机.length +
+            t.实施主体.研究机构.length +
+            t.实施主体.高校.length +
+            t.实施主体.政府机构.length +
+            t.实施主体.学会.length;
+          return (
+            t.科学智能体.length + t.项目跟踪.length + subjectCount + t.科学领域.length >= 1
+          );
+        },
+        { message: '至少需要一个标签' },
+      ),
 
     /** 文章来源类型：agent（AI Agent 生成）| curated（人工整理） */
     articleSource: z.enum(['agent', 'curated']).default('agent'),
