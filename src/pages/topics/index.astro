@@ -301,7 +301,8 @@ const totalSubjects = allTagStats.length;
   .subject-layout {
     display: grid;
     grid-template-columns: minmax(14rem, 0.28fr) minmax(0, 0.72fr);
-    gap: clamp(3.5rem, 6vw, 5rem);
+    /* 加宽列间距，供分类侧栏标题探出（搜索框与标签条目左缘不动） */
+    gap: clamp(6.5rem, 9vw, 9rem);
     padding-top: 2.7rem;
   }
 
@@ -377,15 +378,23 @@ const totalSubjects = allTagStats.length;
   }
 
   .subject-directory {
+    --subject-cat-rail: 7.5rem;
+    --subject-cat-gap: 1.1rem;
+    --subject-sub-rail: 5rem;
+    --subject-sub-gap: 0.9rem;
     min-width: 0;
   }
 
   .subject-category {
+    --subject-hang: calc(var(--subject-cat-rail) + var(--subject-cat-gap));
     display: grid;
-    grid-template-columns: 6.5rem minmax(0, 1fr);
-    column-gap: 1.25rem;
+    grid-template-columns: var(--subject-cat-rail) minmax(0, 1fr);
+    column-gap: var(--subject-cat-gap);
     align-items: start;
+    /* 标题探入左列间隙；右侧条目列与搜索框左缘对齐 */
     margin-top: 2.1rem;
+    margin-left: calc(-1 * var(--subject-hang));
+    width: calc(100% + var(--subject-hang));
   }
 
   .subject-category:first-of-type {
@@ -401,14 +410,15 @@ const totalSubjects = allTagStats.length;
     /* 与 .subject-entry 的 padding-block 对齐，使标题顶线贴齐首条标签名 */
     margin: 0;
     padding-top: 0.72rem;
+    color: var(--color-heading);
+    font-weight: var(--fw-bold);
+    letter-spacing: -0.02em;
     line-height: 1.45;
+    text-align: right;
   }
 
   .subject-category__title {
-    color: var(--color-brand);
-    font-size: 1.12rem;
-    font-weight: var(--fw-semibold);
-    letter-spacing: -0.02em;
+    font-size: 1.4rem;
   }
 
   .subject-category__body {
@@ -416,14 +426,16 @@ const totalSubjects = allTagStats.length;
   }
 
   .subject-category--nested {
-    grid-template-columns: 3.75rem minmax(0, 1fr);
-    column-gap: 1rem;
+    --subject-hang: calc(
+      var(--subject-cat-rail) + var(--subject-cat-gap) + var(--subject-sub-rail) +
+        var(--subject-sub-gap)
+    );
   }
 
   .subject-subcategory {
     display: grid;
-    grid-template-columns: 4.75rem minmax(0, 1fr);
-    column-gap: 1rem;
+    grid-template-columns: var(--subject-sub-rail) minmax(0, 1fr);
+    column-gap: var(--subject-sub-gap);
     align-items: start;
     margin-top: 1.15rem;
   }
@@ -437,10 +449,7 @@ const totalSubjects = allTagStats.length;
   }
 
   .subject-subcategory__title {
-    color: var(--color-text);
-    font-size: 0.95rem;
-    font-weight: var(--fw-medium);
-    letter-spacing: 0.01em;
+    font-size: 1.2rem;
   }
 
   .subject-subcategory__body {
@@ -671,6 +680,27 @@ const totalSubjects = allTagStats.length;
     .editorial-panel__note {
       max-width: 22rem;
     }
+
+    /* 单栏时取消探出，避免冲出容器；标题改叠在条目上方 */
+    .subject-category,
+    .subject-category--nested {
+      grid-template-columns: minmax(0, 1fr);
+      margin-left: 0;
+      width: 100%;
+      column-gap: 0;
+    }
+
+    .subject-category__title,
+    .subject-subcategory__title {
+      padding-top: 0;
+      margin-bottom: 0.35rem;
+      text-align: left;
+    }
+
+    .subject-subcategory {
+      grid-template-columns: minmax(0, 1fr);
+      column-gap: 0;
+    }
   }
 
   @media (max-width: 620px) {
@@ -721,28 +751,19 @@ const totalSubjects = allTagStats.length;
     }
 
     .subject-category {
-      grid-template-columns: 4.75rem minmax(0, 1fr);
-      column-gap: 0.75rem;
       margin-top: 1.7rem;
     }
 
-    .subject-category--nested {
-      grid-template-columns: 3rem minmax(0, 1fr);
-      column-gap: 0.65rem;
-    }
-
     .subject-category__title {
-      font-size: 1rem;
+      font-size: 1.25rem;
     }
 
     .subject-subcategory {
-      grid-template-columns: 3.75rem minmax(0, 1fr);
-      column-gap: 0.55rem;
       margin-top: 0.95rem;
     }
 
     .subject-subcategory__title {
-      font-size: 0.88rem;
+      font-size: 1.1rem;
     }
 
     .subject-index {
