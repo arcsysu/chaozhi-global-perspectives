@@ -25,12 +25,33 @@ import { withBase } from './site';
 export type ArticleEntry = CollectionEntry<'articles'>;
 export type DemoEntry = CollectionEntry<'demo'>;
 
+/** 标签类别（固定顺序） */
+export const TAG_CATEGORY_ORDER = ['科学智能体', '项目', '主体', '领域'] as const;
+export type TagCategory = (typeof TAG_CATEGORY_ORDER)[number];
+
+/** 四类分类标签（空类别保留 []） */
+export type CategorizedTags = Record<TagCategory, string[]>;
+
+/** 按固定类别顺序展平标签（去重，保序） */
+export function flattenTags(tags: CategorizedTags): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const category of TAG_CATEGORY_ORDER) {
+    for (const tag of tags[category] ?? []) {
+      if (seen.has(tag)) continue;
+      seen.add(tag);
+      result.push(tag);
+    }
+  }
+  return result;
+}
+
 /** 公开文章的精简元数据（列表用） */
 export interface ArticleMeta {
   id: string;
   title: string;
   summary: string;
-  tags: string[];
+  tags: CategorizedTags;
   /** 发布时间（ISO 8601 UTC 字符串） */
   publishedAt: string;
   /**
@@ -47,6 +68,12 @@ export interface ArticleMeta {
 export interface TagStat {
   tag: string;
   count: number;
+}
+
+/** 分类标签统计（主题索引页用） */
+export interface CategoryTagStats {
+  category: TagCategory;
+  tags: TagStat[];
 }
 
 /** 归档树节点 */
@@ -270,7 +297,7 @@ export async function getAllTags(): Promise<string[]> {
  */
 export async function getArticlesByTag(tag: string): Promise<MergedArticleMeta[]> {
   const articles = await getMergedThumbnailedArticles();
-  return articles.filter((a) => a.tags.includes(tag));
+  return articles.filter((a) => flattenTags(a.tags).includes(tag));
 }
 
 /**
@@ -411,13 +438,42 @@ export async function getTagStats(): Promise<TagStat[]> {
   const articles = await getMergedThumbnailedArticles();
   const counts = new Map<string, number>();
   for (const a of articles) {
-    for (const t of a.tags) {
+    for (const t of flattenTags(a.tags)) {
       counts.set(t, (counts.get(t) ?? 0) + 1);
     }
   }
   return [...counts.entries()]
     .map(([tag, count]) => ({ tag, count }))
     .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag, 'zh-CN'));
+}
+
+/**
+ * 按四类分区聚合标签统计；各类始终返回（可为空数组）。
+ * 类内按文章数降序，同数按 zh-CN 名称排序。
+ */
+export async function getCategorizedTagStats(): Promise<CategoryTagStats[]> {
+  const articles = await getMergedThumbnailedArticles();
+  const countsByCategory = new Map<TagCategory, Map<string, number>>();
+  for (const category of TAG_CATEGORY_ORDER) {
+    countsByCategory.set(category, new Map());
+  }
+
+  for (const a of articles) {
+    for (const category of TAG_CATEGORY_ORDER) {
+      const bucket = countsByCategory.get(category)!;
+      for (const tag of a.tags[category] ?? []) {
+        bucket.set(tag, (bucket.get(tag) ?? 0) + 1);
+      }
+    }
+  }
+
+  return TAG_CATEGORY_ORDER.map((category) => {
+    const bucket = countsByCategory.get(category)!;
+    const tags = [...bucket.entries()]
+      .map(([tag, count]) => ({ tag, count }))
+      .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag, 'zh-CN'));
+    return { category, tags };
+  });
 }
 
 // ────────────────────────────────────────────────────────────
@@ -429,7 +485,7 @@ export interface DemoArticleMeta {
   id: string;
   title: string;
   summary: string;
-  tags: string[];
+  tags: CategorizedTags;
   /** 整理时间或生成时间（ISO UTC 字符串） */
   sourceTime: string;
   coverImage: string | null;

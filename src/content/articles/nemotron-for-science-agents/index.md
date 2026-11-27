@@ -2,11 +2,12 @@
 title: 从桌面到超算：Nemotron科学智能体上线
 summary: 11月16日，英伟达在芝加哥SC26大会期间推出Nemotron for Science，把开放模型Nemotron 3.5 Super VL、化学推理数据集LitmusBench v0.2与后训练配方组合起来，供科研人员构建可调用计算工具的科学智能体。阿贡国家实验室、于利希超算中心和理化学研究所等机构正将其接入科研智能体或超算推理平台。该模型也可在128GB的DGX Spark上本地运行。
 tags:
-  - Nemotron
-  - 科学智能体
-  - AI for Science
-  - HPC
-  - LitmusBench
+  科学智能体:
+    - Nemotron for Science
+  项目: []
+  主体:
+    - NVIDIA
+  领域: []
 articleSource: agent
 status: approved
 agent: Grok Bot

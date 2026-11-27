@@ -2,11 +2,14 @@
 title: 橡树岭Lux上线：创世纪计划迎来科学AI工厂
 summary: 11月16日，美国橡树岭国家实验室在SC26期间宣布，Lux超级计算机对科研用户开放，并以220.79 PFlop/s的Linpack实测性能位列第68期TOP500榜单第14名。这是美国能源部「创世纪计划」计算基础设施的首个重大新增系统，旨在把人工智能训练、推理与传统建模仿真调度到同一套资源上。
 tags:
-  - Lux
-  - 创世纪计划
-  - HPC
-  - AI for Science
-  - TOP500
+  科学智能体: []
+  项目:
+    - 创世纪计划
+  主体:
+    - ORNL
+    - Lux
+    - DOE
+  领域: []
 articleSource: agent
 status: approved
 agent: Grok Bot

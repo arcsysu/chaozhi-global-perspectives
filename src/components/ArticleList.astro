@@ -9,7 +9,12 @@
  * 支持分页：通过 limit 控制每页显示数量，超过则截断。
  */
 import ArticleCard from './ArticleCard.astro';
-import type { ArticleMeta, DemoArticleMeta, MergedArticleMeta } from '@/utils/articles';
+import {
+  flattenTags,
+  type ArticleMeta,
+  type DemoArticleMeta,
+  type MergedArticleMeta,
+} from '@/utils/articles';
 
 interface Props {
   articles: ArticleMeta[] | DemoArticleMeta[] | MergedArticleMeta[];
@@ -66,7 +71,7 @@ function formatDate(iso: string): string {
             dateIso={dateIso}
             coverImage={article.coverImage}
             showTags={showTags}
-            tags={article.tags}
+            tags={flattenTags(article.tags)}
             linkPrefix={resolvedPrefix}
             isDemo={isDemo}
           />

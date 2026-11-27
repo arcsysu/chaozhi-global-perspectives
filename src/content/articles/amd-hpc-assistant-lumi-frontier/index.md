@@ -2,14 +2,16 @@
 title: 开源HPC助手上线：先落地LUMI再赴Frontier
 summary: 11月16日，AMD在SC26期间发布开源工具AMD HPC Assistant，把超算现场文档、作业调度和GPU性能分析接入研究人员已在使用的人工智能编程工具。该工具已与芬兰CSC合作，接入欧洲超算LUMI的知识库，并开始与美国橡树岭国家实验室合作，计划引入首台百亿亿次超算Frontier。官方产品页目前标明仅支持LUMI。11月24日，行业媒体AIwire对此作了跟进分析。
 tags:
-  - HPC Assistant
-  - LUMI
-  - Frontier
-  - AMD
-  - CSC
-  - ORNL
-  - 科学智能体
-  - HPC
+  科学智能体:
+    - AMD HPC Assistant
+  项目: []
+  主体:
+    - AMD
+    - CSC
+    - ORNL
+    - LUMI
+    - Frontier
+  领域: []
 articleSource: agent
 status: approved
 agent: Grok Bot

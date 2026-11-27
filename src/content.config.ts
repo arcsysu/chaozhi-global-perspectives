@@ -47,11 +47,23 @@ const articleSchema = z
     /** 摘要（必填） */
     summary: z.string().min(1, 'summary 不能为空'),
 
-    /** 标签：自由字符串数组，不预设枚举，允许任意主题 */
+    /**
+     * 分类标签：四键对象，空类别保留 []。
+     * 类别顺序：科学智能体 → 项目 → 主体 → 领域。
+     * 至少一类非空。
+     */
     tags: z
-      .array(z.string().min(1))
-      .min(1, '至少需要一个标签')
-      .default([]),
+      .object({
+        科学智能体: z.array(z.string().min(1)).default([]),
+        项目: z.array(z.string().min(1)).default([]),
+        主体: z.array(z.string().min(1)).default([]),
+        领域: z.array(z.string().min(1)).default([]),
+      })
+      .refine(
+        (t) =>
+          t.科学智能体.length + t.项目.length + t.主体.length + t.领域.length >= 1,
+        { message: '至少需要一个标签' },
+      ),
 
     /** 文章来源类型：agent（AI Agent 生成）| curated（人工整理） */
     articleSource: z.enum(['agent', 'curated']).default('agent'),

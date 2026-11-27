@@ -41,7 +41,7 @@ src/content/_demo/<slug>/images/cover.svg      ← Demo 图片（可选）
 | --- | --- | --- | --- |
 | `title` | string | 必填 | 文章标题，非空 |
 | `summary` | string | 必填 | 摘要，非空，建议 80–200 字 |
-| `tags` | string[] | 必填（≥1） | 自由标签数组，无预设枚举 |
+| `tags` | 分类对象 | 必填（合计 ≥1） | 四键：`科学智能体` / `项目` / `主体` / `领域`；空类别写 `[]`；各类内为自由字符串数组 |
 | `articleSource` | `'agent' \| 'curated'` | 必填 | 默认 `agent`。来源类型 |
 | `status` | `'draft' \| 'approved'` | 必填 | 默认 `draft`。审核状态 |
 | `agent` | string | agent 时必填 | Agent 名称/版本。curated 时**禁止**填写 |
@@ -200,7 +200,13 @@ draft ──(审核通过 + 补充 publishedAt)──→ approved
 ---
 title: HPC+AI for Science 前沿观察计划正式启动
 summary: ...
-tags: [超智融合, AI for Science]
+tags:
+  科学智能体: []
+  项目:
+    - 前沿观察计划
+  主体:
+    - CCF
+  领域: []
 articleSource: curated
 status: approved
 curatedAt: 2026-11-15T09:00:00+08:00
@@ -216,7 +222,13 @@ sourceType: press-release
 ---
 title: ...
 summary: ...
-tags: [AI for Science]
+tags:
+  科学智能体:
+    - Nemotron for Science
+  项目: []
+  主体:
+    - NVIDIA
+  领域: []
 articleSource: agent
 status: draft
 agent: gpt-4-research-v1
@@ -230,7 +242,13 @@ generatedAt: 2026-11-16T14:30:00+08:00
 ---
 title: 美国创世纪计划进展及对我国的启示与建议
 summary: ...
-tags: [创世纪计划, AI for Science]
+tags:
+  科学智能体: []
+  项目:
+    - 创世纪计划
+  主体:
+    - DOE
+  领域: []
 articleSource: curated
 status: draft
 curatedAt: 2026-11-13T00:00:00+08:00
@@ -249,7 +267,7 @@ internal: true
 | `title: Required` | 写入过程中瞬时错误，或确实缺失 | 等待 "Reloaded data"；若持续，检查 frontmatter |
 | `title 不能为空` | title 为空字符串 | 填写非空标题 |
 | `summary 不能为空` | summary 为空字符串 | 填写非空摘要 |
-| `至少需要一个标签` | tags 为空数组或缺失 | 添加至少一个标签 |
+| `至少需要一个标签` | 四类标签合计为空或结构非法 | 至少在一类中填写一个标签，空类别保留 `[]` |
 | `Agent 生成文章必须填写 agent 标识` | articleSource=agent 但无 agent | 填写 agent 字段 |
 | `人工整理文章必须填写 curatedAt` | articleSource=curated 但无 curatedAt | 填写 curatedAt |
 | `人工整理文章不得填写 agent` | curated 文章误填了 agent | 删除 agent 字段 |

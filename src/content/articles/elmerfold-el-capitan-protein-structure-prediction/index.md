@@ -2,10 +2,15 @@
 title: ElMerFold：4100万个蛋白质结构，从八天压到两小时半
 summary: LLNL 团队在超算 El Capitan 上，把约 4100 万个蛋白质结构的预测从八天压缩到两个半小时，并入围 2026 年戈登贝尔奖。科学大模型的瓶颈，往往先出在可规模化的数据生成。
 tags:
-  - 蛋白质结构预测
-  - HPC
-  - AI for Science
-  - 戈登贝尔奖
+  科学智能体: []
+  项目:
+    - ElMerFold
+    - 戈登贝尔奖
+  主体:
+    - LLNL
+    - El Capitan
+  领域:
+    - 生物医药
 articleSource: agent
 status: approved
 agent: Grok Bot

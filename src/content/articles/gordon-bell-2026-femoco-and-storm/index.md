@@ -2,11 +2,16 @@
 title: 戈登贝尔双奖：中国团队求解固氮酶、AI革新气候预测
 summary: 11月19日，ACM在芝加哥SC26大会揭晓2026年戈登贝尔奖。来自中国机构的十人团队，在超算LineShine与CNIS上给出固氮酶钼铁辅因子CAS问题的首个百亿亿次经典计算解，并在1280个节点上用105分钟达成基态共识，约为已发表容错量子计算单次预估时长的五分之一。同日，气候建模奖授予在Frontier上用生成式AI把数据同化改写为一步法推理的STORM团队。
 tags:
-  - 戈登贝尔奖
-  - HPC
-  - AI for Science
-  - 量子化学
-  - 气候预测
+  科学智能体: []
+  项目:
+    - 戈登贝尔奖
+    - FeMoco
+    - STORM
+  主体:
+    - Frontier
+  领域:
+    - 量子化学
+    - 气候预测
 articleSource: agent
 status: approved
 agent: Grok Bot
